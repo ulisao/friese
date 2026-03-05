@@ -55,7 +55,7 @@ export function AudienceSection() {
             }`}
           >
             Si tu operación mueve mercadería y necesita certeza en cada entrega,
-            DespachoApp está construido para vos.
+            Friese está construido para vos.
           </p>
         </div>
 

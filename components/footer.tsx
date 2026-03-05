@@ -18,7 +18,7 @@ export function Footer() {
                 </span>
               </div>
               <span className="text-base font-semibold text-foreground">
-                DespachoApp
+                Friese
               </span>
             </div>
             <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
@@ -49,7 +49,7 @@ export function Footer() {
 
         <div className="mt-10 border-t border-border/50 pt-6">
           <p className="text-xs text-muted-foreground">
-            {"© 2026 DespachoApp. Todos los derechos reservados."}
+            {"© 2026 Friese. Todos los derechos reservados."}
           </p>
         </div>
       </div>

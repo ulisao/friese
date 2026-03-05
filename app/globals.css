@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* DespachoApp — Dark industrial palette */
+  /* Friese — Dark industrial palette */
   --background: oklch(0.13 0.005 250);
   --foreground: oklch(0.93 0.01 80);
   --card: oklch(0.16 0.005 250);

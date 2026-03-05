@@ -17,10 +17,10 @@ export function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary">
-            <span className="text-sm font-bold text-primary-foreground">D</span>
+            <span className="text-sm font-bold text-primary-foreground">F</span>
           </div>
           <span className="text-lg font-semibold tracking-tight text-foreground">
-            DespachoApp
+            Friese
           </span>
         </Link>
 
