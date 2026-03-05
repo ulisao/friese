@@ -16,7 +16,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'DespachoApp — Inteligencia logística para empresas',
+  title: 'Friese — Inteligencia logística para empresas',
   description:
     'Plataforma de inteligencia logística empresarial. Trazabilidad, evidencia certificada y gestión de reclamos para PyMEs en Latinoamérica.',
   icons: {
