@@ -60,10 +60,6 @@ export function HeroSection() {
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
             </div>
-
-            <p className="mt-5 text-sm text-muted-foreground">
-              {"Más de 120 empresas ya están en la lista de espera."}
-            </p>
           </div>
 
           {/* Right — product visual */}

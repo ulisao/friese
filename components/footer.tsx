@@ -29,11 +29,11 @@ export function Footer() {
 
           {/* Links */}
           <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
-            <a href="#" className="transition-colors hover:text-foreground">
+            <a href="/privacidad" className="transition-colors hover:text-foreground">
               {"Política de privacidad"}
             </a>
             <a
-              href="mailto:hola@despachoapp.com"
+              href="mailto:friesearg@gmail.com"
               className="transition-colors hover:text-foreground"
             >
               Contacto

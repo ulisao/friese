@@ -1,21 +1,23 @@
 "use client"
 
-import { useState, type FormEvent } from "react"
-import { ArrowRight, CheckCircle2 } from "lucide-react"
-import { useScrollAnimation } from "@/hooks/use-scroll-animation"
+import { useState, FormEvent } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { CheckCircle2 } from "lucide-react"
 
 export function WaitlistSection() {
-  const { ref, isVisible } = useScrollAnimation(0.1)
+  const [company, setCompany] = useState("")
   const [email, setEmail] = useState("")
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError("")
 
-    if (!email) {
-      setError("Ingresá tu email.")
+    if (!company || !email) {
+      setError("Por favor, completá ambos campos.")
       return
     }
 
@@ -25,112 +27,95 @@ export function WaitlistSection() {
       return
     }
 
-    // Simulate submission
-    setSubmitted(true)
+    setIsLoading(true)
+
+    const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeLOrlEBOWXWiN_8IPjSQOBppSqH9d_SbfXDgqs68xyAZYr4g/formResponse"
+    
+    const formData = new URLSearchParams()
+    formData.append("entry.1522934148", company)
+    formData.append("entry.2106078397", email)
+
+    try {
+      await fetch(FORM_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData.toString(),
+      })
+
+      setSubmitted(true)
+    } catch (err) {
+      console.error(err)
+      setError("Hubo un problema al procesar tu solicitud. Intentá de nuevo.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <section
-      id="waitlist"
-      className="relative border-t border-border/50 bg-secondary py-24 lg:py-32"
-      ref={ref}
-    >
-      {/* Subtle pattern */}
-      <div className="absolute inset-0 opacity-[0.03]">
-        <div
-          className="h-full w-full"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, currentColor 0px, currentColor 1px, transparent 1px, transparent 60px), repeating-linear-gradient(0deg, currentColor 0px, currentColor 1px, transparent 1px, transparent 60px)",
-          }}
-        />
-      </div>
+    // Cambiamos bg-primary por bg-muted/30 para separarlo del resto sin ser tan invasivo
+    <section 
+    id="waitlist"
+    className="py-24 bg-muted/30 flex justify-center w-full border-y border-border/50">
+      <div className="container mx-auto px-4 md:px-6 text-center">
+        <div className="max-w-2xl mx-auto space-y-8 flex flex-col items-center">
+          <div className="space-y-4 w-full">
+            {/* Texto adaptado a los colores base */}
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tighter text-foreground">
+              ¿Listo para transformar tu forma de trabajar?
+            </h2>
+            <p className="text-muted-foreground md:text-xl">
+              Unite a nuestra lista de espera y sé de los primeros en probar la plataforma.
+            </p>
+          </div>
 
-      <div className="relative mx-auto max-w-3xl px-6 text-center lg:px-8">
-        <p
-          className={`mb-3 text-sm font-semibold tracking-widest text-primary uppercase ${
-            isVisible ? "animate-fade-up" : "opacity-0"
-          }`}
-        >
-          Acceso anticipado
-        </p>
-        <h2
-          className={`font-serif text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl text-balance ${
-            isVisible ? "animate-fade-up animation-delay-100" : "opacity-0"
-          }`}
-        >
-          Estamos en etapa de acceso anticipado.
-        </h2>
-        <p
-          className={`mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground ${
-            isVisible ? "animate-fade-up animation-delay-200" : "opacity-0"
-          }`}
-        >
-          Los primeros en sumarse van a tener onboarding prioritario, precio de
-          fundadores e influencia directa sobre el roadmap del producto.
-        </p>
-
-        <div
-          className={`mt-10 ${
-            isVisible ? "animate-fade-up animation-delay-300" : "opacity-0"
-          }`}
-        >
           {submitted ? (
-            <div className="mx-auto flex max-w-md flex-col items-center rounded-lg border border-primary/30 bg-primary/10 p-8">
-              <CheckCircle2 className="h-10 w-10 text-primary" />
-              <p className="mt-4 text-lg font-semibold text-foreground">
-                {"¡Estás en la lista!"}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Te vamos a avisar apenas sea tu turno. Revisá tu email.
+            /* Tarjeta de éxito con estilo "card" para máximo contraste */
+            <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto space-y-4 p-8 bg-card border border-border shadow-sm rounded-2xl">
+              <CheckCircle2 className="w-12 h-12 text-primary" />
+              <h3 className="text-2xl font-bold text-foreground">¡Gracias por sumarte!</h3>
+              <p className="text-muted-foreground">
+                Anotamos a <span className="font-semibold text-foreground">{company}</span>. Te vamos a avisar a <span className="font-semibold text-foreground">{email}</span> cuando estemos listos.
               </p>
             </div>
           ) : (
-            <form
-              onSubmit={handleSubmit}
-              className="mx-auto flex max-w-lg flex-col gap-3 sm:flex-row"
-            >
-              <div className="relative flex-1">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value)
-                    setError("")
-                  }}
-                  placeholder="tu@empresa.com"
-                  className="w-full rounded-sm border border-border bg-background px-5 py-4 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  aria-label="Email para lista de espera"
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-md mx-auto p-6 md:p-8 bg-card border border-border shadow-sm rounded-2xl">
+              <div className="space-y-4">
+                {/* Inputs usando los colores base que ya tenés en ui/input.tsx */}
+                <Input
+                  type="text"
+                  placeholder="Nombre de la empresa"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  className="bg-background border-input text-foreground h-12"
+                  disabled={isLoading}
                 />
-                {error && (
-                  <p className="absolute -bottom-6 left-0 text-sm text-destructive">
-                    {error}
-                  </p>
-                )}
+                <Input
+                  type="email"
+                  placeholder="Tu correo electrónico"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-background border-input text-foreground h-12"
+                  disabled={isLoading}
+                />
               </div>
-              <button
-                type="submit"
-                className="group flex shrink-0 items-center justify-center gap-2 rounded-sm bg-primary px-8 py-4 text-base font-semibold text-primary-foreground transition-all hover:brightness-110"
+              
+              {error && <p className="text-destructive text-sm font-medium">{error}</p>}
+              
+              <Button 
+                type="submit" 
+                size="lg" 
+                variant="default" // Volvemos al botón primario por defecto
+                className="w-full mt-2"
+                disabled={isLoading}
               >
-                Reservar mi lugar
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </button>
+                {isLoading ? "Enviando..." : "Unirme a la lista de espera"}
+              </Button>
             </form>
           )}
         </div>
-
-        {!submitted && (
-          <p
-            className={`mt-8 text-sm text-muted-foreground ${
-              isVisible
-                ? "animate-fade-up animation-delay-400"
-                : "opacity-0"
-            }`}
-          >
-            Sin tarjeta de crédito. Sin compromiso. Te avisamos cuando es tu
-            turno.
-          </p>
-        )}
       </div>
     </section>
   )
