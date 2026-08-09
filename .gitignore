@@ -1,0 +1,36 @@
+# Entorno / secrets
+.env
+.env.txt
+*.env
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+
+# Django
+db.sqlite3
+staticfiles/
+media/
+*.log
+
+# Tests / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Editores / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Documentación / especificación del proyecto — NO se pushea (solo el proyecto en sí)
+CLAUDE.md
+PROGRESS.md
+TASK_TEMPLATE.md
+Friese_*
+docs/
+*.docx
