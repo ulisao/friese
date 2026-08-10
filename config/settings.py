@@ -173,6 +173,29 @@ SIMPLE_JWT = {
 }
 
 
+# Base del frontend público (receptor): con esto se arma el link del remito que
+# se le envía al receptor al despachar.
+FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:3000")
+
+
+# Cloudflare R2 — almacenamiento de las fotos de evidencia (secciones 1.1 y 2.1).
+# Es S3-compatible: se accede con boto3 contra el endpoint de la cuenta.
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
+R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "")
+R2_ENDPOINT_URL = os.environ.get(
+    "R2_ENDPOINT_URL", f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+)
+# Base de la URL que se guarda en Evidence.file_url. Por defecto es el endpoint S3,
+# que NO es accesible sin firmar: cuando el bucket tenga su dominio público (dev URL
+# de r2.dev o dominio propio) basta con setear R2_PUBLIC_BASE_URL en el env; el resto
+# del código no cambia.
+R2_PUBLIC_BASE_URL = os.environ.get(
+    "R2_PUBLIC_BASE_URL", f"{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}"
+)
+
+
 # CORS — permite al frontend (operador/receptor) consumir la API.
 # En dev se listan los orígenes locales; en prod se configuran vía env.
 CORS_ALLOWED_ORIGINS = [

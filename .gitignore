@@ -16,6 +16,11 @@ staticfiles/
 media/
 *.log
 
+# Frontend
+node_modules/
+dist/
+.vite/
+
 # Tests / tooling
 .pytest_cache/
 .ruff_cache/

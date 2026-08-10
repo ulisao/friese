@@ -1,0 +1,76 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Sistema de diseño Friese (docs/diseno.md + desarrollo.md sección 7).
+ * La app del operador es SIEMPRE modo oscuro: los tokens de shadcn se definen
+ * una sola vez con los valores oscuros, no hay tema claro que alternar.
+ */
+:root {
+  --radius: 0.5rem; /* cards rounded-lg (8px); botones/inputs usan rounded-md */
+
+  --background: #1a1a22; /* fondo base */
+  --foreground: #f1f1f5;
+
+  --card: #24242e; /* superficies elevadas */
+  --card-foreground: #f1f1f5;
+  --popover: #24242e;
+  --popover-foreground: #f1f1f5;
+
+  --primary: #4f46e5; /* indigo funcional: botones, links, estados activos */
+  --primary-foreground: #ffffff;
+
+  --secondary: #2e2e3a;
+  --secondary-foreground: #f1f1f5;
+  --muted: #2e2e3a;
+  --muted-foreground: #a1a1ae;
+  --accent: #2e2e3a;
+  --accent-foreground: #f1f1f5;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #33333f;
+  --input: #33333f;
+  --ring: #4f46e5;
+}
+
+@theme inline {
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
