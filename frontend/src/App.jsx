@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { LoginPage } from '@/pages/LoginPage'
 import { NewShipmentPage } from '@/pages/NewShipmentPage'
+import { PublicShipmentPage } from '@/pages/PublicShipmentPage'
 import { ShipmentDetailPage } from '@/pages/ShipmentDetailPage'
 import { ShipmentsPage } from '@/pages/ShipmentsPage'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
@@ -23,6 +24,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Pantalla del receptor: pública, sin login. Es la ruta que arma
+          emails.build_public_link() con el public_token del remito. */}
+      <Route path="/remito/:token" element={<PublicShipmentPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<ShipmentsPage />} />

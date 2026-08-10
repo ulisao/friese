@@ -44,6 +44,8 @@ THIRD_PARTY_APPS = [
     # Blacklist de refresh tokens: necesaria para BLACKLIST_AFTER_ROTATION y para
     # la revocación manual desde el admin (ver docs/desarrollo.md sección 4).
     'rest_framework_simplejwt.token_blacklist',
+    # Tareas periódicas sobre el cron del sistema (ver CRONJOBS más abajo).
+    'django_crontab',
 ]
 
 LOCAL_APPS = [
@@ -174,8 +176,27 @@ SIMPLE_JWT = {
 
 
 # Base del frontend público (receptor): con esto se arma el link del remito que
-# se le envía al receptor al despachar.
-FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:3000")
+# se le envía al receptor al despachar. La pantalla del receptor (tarea 3.4) vive
+# en la MISMA app de Vite que la del operador, en la ruta pública /remito/{token},
+# así que el default es el dev server de Vite.
+FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:5173")
+
+
+# Tareas periódicas (django-crontab) — docs/desarrollo.md sección 6.
+# Cierre automático: los remitos despachados cuya ventana de respuesta de 48hs
+# venció sin respuesta del receptor pasan a 'accepted'. Se corre cada 15 minutos
+# (el spec fija la ventana de 48hs, no la frecuencia del chequeo): así el remito
+# se cierra a lo sumo 15 minutos después de vencer, y la query es una sola sobre
+# los remitos en 'dispatched'.
+# Se registra en el cron del sistema con `python manage.py crontab add` (y se
+# quita con `crontab remove`) al deployar — requiere un host Linux con cron.
+CRONJOBS = [
+    (
+        "*/15 * * * *",
+        "django.core.management.call_command",
+        ["close_expired_shipments"],
+    ),
+]
 
 
 # Cloudflare R2 — almacenamiento de las fotos de evidencia (secciones 1.1 y 2.1).

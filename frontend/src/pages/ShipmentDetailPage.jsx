@@ -40,6 +40,10 @@ function formatDate(value) {
  * Orden del flujo: primero las fotos, y recién cuando subieron bien se habilita el
  * despacho. Así un remito nunca queda despachado (irreversible) sin su evidencia; si
  * una subida falla, el remito sigue en draft y el operador reintenta.
+ *
+ * Cada foto puede ir atada a un producto del remito (botón "Sacar foto" de cada ítem,
+ * sin límite de fotos por producto) o al remito completo (botón general). El backend
+ * lo guarda en Evidence.shipment_item.
  */
 export function ShipmentDetailPage() {
   const { id } = useParams()
@@ -48,11 +52,13 @@ export function ShipmentDetailPage() {
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'error'
 
   // Fotos sacadas que todavía no están confirmadas por el backend.
-  // { key, previewUrl, blob, state: 'uploading' | 'error' }
+  // { key, previewUrl, blob, itemId, state: 'uploading' | 'error' }
   const [pending, setPending] = useState([])
   const pendingRef = useRef(pending)
   pendingRef.current = pending
 
+  // itemId de la foto que se está por sacar: null = foto del remito completo.
+  const [cameraItemId, setCameraItemId] = useState(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [dispatching, setDispatching] = useState(false)
@@ -92,6 +98,8 @@ export function ShipmentDetailPage() {
       // solo usa la extensión.
       form.append('file', photo.blob, 'evidencia.jpg')
       form.append('type', 'dispatch')
+      // Sin ítem la foto documenta el remito completo (el backend lo deja en null).
+      if (photo.itemId != null) form.append('shipment_item', photo.itemId)
 
       try {
         const { data } = await api.post(`/shipments/${id}/evidence/`, form)
@@ -118,14 +126,20 @@ export function ShipmentDetailPage() {
         key: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         previewUrl: URL.createObjectURL(blob),
         blob,
+        itemId: cameraItemId,
         state: 'uploading',
       }
       setCameraOpen(false)
       setPending((current) => [...current, photo])
       uploadPhoto(photo)
     },
-    [uploadPhoto],
+    [cameraItemId, uploadPhoto],
   )
+
+  function openCamera(itemId) {
+    setCameraItemId(itemId)
+    setCameraOpen(true)
+  }
 
   function handleDiscard(photo) {
     setPending((current) => current.filter((item) => item.key !== photo.key))
@@ -178,6 +192,13 @@ export function ShipmentDetailPage() {
   const isDraft = shipment.status === 'draft'
   const evidence = shipment.evidence ?? []
   const items = shipment.items ?? []
+  // Nombre del producto de cada foto: la evidencia trae el id del ítem, no el nombre.
+  const itemNames = new Map(items.map((item) => [item.id, item.product_name]))
+  const photoLabel = (itemId) =>
+    itemId == null ? 'Remito completo' : (itemNames.get(itemId) ?? 'Producto eliminado')
+  const countFor = (itemId) =>
+    evidence.filter((photo) => photo.shipment_item === itemId).length +
+    pending.filter((photo) => photo.itemId === itemId).length
   // Mientras haya fotos sin confirmar (subiendo o falladas) no se despacha: el
   // despacho es irreversible y tiene que salir con la evidencia ya guardada.
   const hasUnconfirmedPhotos = pending.length > 0
@@ -236,16 +257,35 @@ export function ShipmentDetailPage() {
               <p className="text-sm text-muted-foreground">Este remito no tiene productos.</p>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="shipment-items">
-                {items.map((item) => (
-                  <li key={item.id} className="rounded-md border p-3">
-                    <p className="font-medium">{item.product_name}</p>
-                    {/* La unidad va SIEMPRE junto a la cantidad (ej. "50 bolsas"). */}
-                    <p className="text-sm text-muted-foreground">
-                      {Number(item.quantity)} {item.product_unit}
-                    </p>
-                    {item.notes && <p className="text-sm text-muted-foreground">{item.notes}</p>}
-                  </li>
-                ))}
+                {items.map((item) => {
+                  const photos = countFor(item.id)
+                  return (
+                    <li key={item.id} className="rounded-md border p-3" data-item-id={item.id}>
+                      <p className="font-medium">{item.product_name}</p>
+                      {/* La unidad va SIEMPRE junto a la cantidad (ej. "50 bolsas"). */}
+                      <p className="text-sm text-muted-foreground">
+                        {Number(item.quantity)} {item.product_unit}
+                      </p>
+                      {item.notes && <p className="text-sm text-muted-foreground">{item.notes}</p>}
+                      <p className="pt-1 text-xs text-muted-foreground" data-item-photos={photos}>
+                        {photos === 0
+                          ? 'Sin fotos de este producto'
+                          : `${photos} foto${photos === 1 ? '' : 's'} de este producto`}
+                      </p>
+                      {isDraft && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-2 h-12 w-full"
+                          data-testid={`open-camera-item-${item.id}`}
+                          onClick={() => openCamera(item.id)}
+                        >
+                          Sacar foto de este producto
+                        </Button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </CardContent>
@@ -268,13 +308,20 @@ export function ShipmentDetailPage() {
             {(evidence.length > 0 || pending.length > 0) && (
               <ul className="grid grid-cols-2 gap-3" data-testid="evidence-list">
                 {evidence.map((photo) => (
-                  <li key={`evidence-${photo.id}`} data-evidence-id={photo.id}>
+                  <li
+                    key={`evidence-${photo.id}`}
+                    data-evidence-id={photo.id}
+                    data-evidence-item={photo.shipment_item ?? ''}
+                  >
                     <img
                       src={photo.file_url}
                       alt={`Evidencia del remito #${shipment.id}`}
                       className="aspect-square w-full rounded-md border object-cover"
                     />
-                    <p className="pt-1 text-xs text-muted-foreground">
+                    <p className="truncate pt-1 text-xs font-medium">
+                      {photoLabel(photo.shipment_item)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
                       {formatDate(photo.uploaded_at)}
                     </p>
                   </li>
@@ -287,6 +334,7 @@ export function ShipmentDetailPage() {
                       alt="Foto pendiente de subir"
                       className="aspect-square w-full rounded-md border object-cover opacity-60"
                     />
+                    <p className="truncate pt-1 text-xs font-medium">{photoLabel(photo.itemId)}</p>
                     {photo.state === 'uploading' ? (
                       <p className="pt-1 text-xs text-muted-foreground">Subiendo…</p>
                     ) : (
@@ -323,9 +371,9 @@ export function ShipmentDetailPage() {
                 type="button"
                 className="h-12 w-full"
                 data-testid="open-camera"
-                onClick={() => setCameraOpen(true)}
+                onClick={() => openCamera(null)}
               >
-                Sacar foto
+                Sacar foto del remito
               </Button>
             )}
           </CardContent>

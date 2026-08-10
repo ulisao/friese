@@ -17,6 +17,9 @@ whitenoise==6.12.0
 # Entorno
 python-dotenv==1.2.2
 
+# Tareas periódicas (cierre automático de remitos vencidos)
+django-crontab==0.7.1
+
 # Almacenamiento (Cloudflare R2 vía S3) y emails (Resend)
 boto3==1.43.67
 resend==2.35.0

@@ -11,6 +11,15 @@ export const api = axios.create({ baseURL: API_BASE_URL })
 // interceptor de abajo (si no, un 401 del refresh dispararía otro refresh).
 const plainClient = axios.create({ baseURL: API_BASE_URL })
 
+/*
+ * Cliente del flujo PÚBLICO del receptor (tareas 3.1/3.2): sin Authorization y sin
+ * el interceptor de refresh. El receptor no tiene sesión, y la única credencial de
+ * esos endpoints es el public_token de la URL. Va aparte a propósito: si el link se
+ * abriera en el navegador de un operador logueado, no hay que mandarle su token a un
+ * endpoint público ni disparar un refresh por un error de ese flujo.
+ */
+export const publicApi = axios.create({ baseURL: API_BASE_URL })
+
 export function login({ username, password }) {
   return plainClient.post('/auth/login/', { username, password })
 }

@@ -37,6 +37,14 @@ class Shipment(models.Model):
     link_opened_at = models.DateTimeField(null=True, blank=True)
     response_deadline = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Texto opcional con el que el receptor explica la queja (tarea 3.2). Solo lo
+    # escribe el endpoint público de dispute; vacío en cualquier otro estado.
+    dispute_reason = models.TextField(blank=True)
+    # True = el remito quedó en 'accepted' por el cierre automático a las 48hs
+    # (tarea 3.3), no porque el receptor lo haya aceptado. Permite distinguir la
+    # conformidad expresa del silencio del cliente. Lo escribe únicamente la tarea
+    # periódica close_expired_shipments.
+    auto_closed = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Shipment #{self.pk} ({self.get_status_display()})"
@@ -75,6 +83,16 @@ class Evidence(models.Model):
     shipment = models.ForeignKey(
         Shipment,
         on_delete=models.CASCADE,
+        related_name="evidence",
+    )
+    # Opcional: la foto puede documentar un producto concreto del remito o el remito
+    # completo (tarea 3.2). SET_NULL para no perder la evidencia si el ítem se borra
+    # mientras el remito todavía es un draft.
+    shipment_item = models.ForeignKey(
+        ShipmentItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="evidence",
     )
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)

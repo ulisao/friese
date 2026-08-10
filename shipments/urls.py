@@ -1,7 +1,14 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import ShipmentItemViewSet, ShipmentViewSet
+from .views import (
+    PublicReceptionEvidenceView,
+    PublicShipmentAcceptView,
+    PublicShipmentDisputeView,
+    PublicShipmentView,
+    ShipmentItemViewSet,
+    ShipmentViewSet,
+)
 
 # Router genera GET/POST /api/shipments/ y GET /api/shipments/{id}/ (ver sección 5).
 router = DefaultRouter()
@@ -31,5 +38,29 @@ urlpatterns = router.urls + [
         "shipments/<int:shipment_pk>/items/<int:pk>/",
         shipment_item_detail,
         name="shipment-item-detail",
+    ),
+    # Link público del receptor (tarea 3.1). El converter <uuid:> hace que un token
+    # con formato inválido dé 404 en el ruteo, sin llegar a la vista ni a la DB.
+    path(
+        "public/shipment/<uuid:token>/",
+        PublicShipmentView.as_view(),
+        name="public-shipment",
+    ),
+    # Respuesta del receptor (tarea 3.2): fotos de recepción de a una, y después
+    # conformidad o queja.
+    path(
+        "public/shipment/<uuid:token>/evidence/",
+        PublicReceptionEvidenceView.as_view(),
+        name="public-shipment-evidence",
+    ),
+    path(
+        "public/shipment/<uuid:token>/accept/",
+        PublicShipmentAcceptView.as_view(),
+        name="public-shipment-accept",
+    ),
+    path(
+        "public/shipment/<uuid:token>/dispute/",
+        PublicShipmentDisputeView.as_view(),
+        name="public-shipment-dispute",
     ),
 ]
