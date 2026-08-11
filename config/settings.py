@@ -1,30 +1,115 @@
 """
 Django settings for config project (Friese).
 
-Setup base de la Fase 1 (Tarea 1.1): proyecto conectado a Supabase, con CORS y
-Whitenoise. Modelos, auth y admin se configuran en tareas siguientes.
+UN SOLO archivo de settings para los dos ambientes (tarea 6.1): todo lo que
+cambia entre desarrollo y producción se resuelve por variables de entorno, sin
+settings_dev / settings_prod separados. Así `manage.py`, `wsgi.py`, `asgi.py` y
+los cron jobs de django-crontab siguen apuntando a `config.settings` y no hay
+manera de correr un comando con el módulo de settings equivocado.
+
+- `DJANGO_ENV` elige el ambiente: `development` (default) o `production`.
+- En desarrollo, cada variable cae a un default cómodo para poder clonar el repo
+  y correr sin configurar nada.
+- En producción NO hay defaults para lo crítico: si falta algo, el proceso no
+  arranca y el error lista todas las variables faltantes juntas (ver el chequeo
+  al final del archivo).
+
+La documentación de cada variable está en `.env.example`, en la raíz del repo.
 """
 
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Carga de variables de entorno desde .env (raíz del repo).
+# Carga de variables de entorno desde .env (raíz del repo). En producción las
+# variables las inyecta la plataforma (Railway/Render) y no hay archivo .env:
+# load_dotenv no hace nada si el archivo no existe, y nunca pisa una variable
+# que ya venga del entorno real.
 load_dotenv(BASE_DIR / ".env")
 
 
+# --- Helpers de entorno -----------------------------------------------------
+
+# Variables obligatorias que faltan. Se juntan todas y se reportan de una sola
+# vez al final del archivo, para no tener que deployar N veces para descubrirlas
+# de a una.
+MISSING_ENV_VARS = []
+
+
+def env(name, default=""):
+    """Variable de entorno como texto, sin espacios sobrantes."""
+    return os.environ.get(name, default).strip()
+
+
+def env_bool(name, default):
+    return env(name, "true" if default else "false").lower() == "true"
+
+
+def split_csv(value):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def env_required(name):
+    """Variable obligatoria en TODOS los ambientes."""
+    value = env(name)
+    if not value:
+        MISSING_ENV_VARS.append(name)
+    return value
+
+
+def env_required_in_production(name, dev_default):
+    """
+    Variable obligatoria SOLO en producción; en desarrollo cae a `dev_default`.
+    Son las que tienen un valor local razonable (localhost, la casilla de prueba
+    de Resend) pero que en producción tienen que setearse a mano sí o sí.
+    """
+    value = env(name)
+    if value:
+        return value
+    if IS_PRODUCTION:
+        MISSING_ENV_VARS.append(name)
+        return ""
+    return dev_default
+
+
+# --- Ambiente ---------------------------------------------------------------
+
+DJANGO_ENV = env("DJANGO_ENV", "development").lower()
+if DJANGO_ENV not in ("development", "production"):
+    raise ImproperlyConfigured(
+        f"DJANGO_ENV inválido: {DJANGO_ENV!r}. "
+        "Valores válidos: 'development' o 'production'."
+    )
+IS_PRODUCTION = DJANGO_ENV == "production"
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-only-change-me")
+# El default sirve solo para desarrollo; en producción es obligatoria y además
+# se rechaza explícitamente que sea esta misma clave.
+DEV_SECRET_KEY = "django-insecure-dev-only-change-me"
+SECRET_KEY = env_required_in_production("SECRET_KEY", DEV_SECRET_KEY)
+# Cualquier clave con el prefijo que pone `startproject` es una clave de
+# desarrollo, no solo la de arriba: Django la marca como insegura (W009 de
+# `check --deploy`) y con ella se pueden forjar sesiones y tokens de reseteo.
+if IS_PRODUCTION and SECRET_KEY.startswith("django-insecure-"):
+    MISSING_ENV_VARS.append("SECRET_KEY (no puede ser una clave de desarrollo)")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
+# En producción DEBUG queda apagado siempre: no se puede prender por env, ni por
+# error ni a propósito. La variable DEBUG solo tiene efecto en desarrollo.
+DEBUG = False if IS_PRODUCTION else env_bool("DEBUG", True)
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+# En producción hay que listar los hosts reales (el dominio del backend); el
+# default de localhost no sirve y dejarlo pasar daría 400 en todas las requests.
+ALLOWED_HOSTS = split_csv(
+    env_required_in_production("ALLOWED_HOSTS", "localhost,127.0.0.1")
+)
 
 
 # Application definition
@@ -95,12 +180,21 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database — Supabase (PostgreSQL) vía DATABASE_URL.
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+# Obligatoria en los dos ambientes: no hay default posible. Si falta, el dict
+# queda vacío y el chequeo del final del archivo corta con un error claro (antes
+# de que Django intente conectarse a nada).
+
+DATABASE_URL = env_required("DATABASE_URL")
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ["DATABASE_URL"],
-        conn_max_age=600,
-        conn_health_checks=True,
+    'default': (
+        dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+        if DATABASE_URL
+        else {}
     )
 }
 
@@ -161,6 +255,28 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    # Rate limiting de los endpoints públicos del receptor (tarea 6.2). Las clases
+    # NO se aplican por default: se declaran vista por vista en shipments/views.py,
+    # así el operador autenticado (que trabaja contra la misma API) nunca queda
+    # limitado por el cupo del receptor. Ver shipments/throttling.py.
+    #
+    # Dos ventanas a la vez, el patrón burst/sustained de DRF: la corta corta el
+    # martilleo inmediato; la larga corta el goteo constante que igual sumaría
+    # miles de requests por hora. Los valores son generosos para un receptor real
+    # (abre el link, sube N fotos de a una y responde: ~15 requests en total) y
+    # cortos para un script.
+    "DEFAULT_THROTTLE_RATES": {
+        "public_burst": env("PUBLIC_THROTTLE_BURST", "30/min"),
+        "public_sustained": env("PUBLIC_THROTTLE_SUSTAINED", "300/hour"),
+    },
+    # De qué IP se cuenta el cupo. En producción el backend está detrás del proxy
+    # de la plataforma (Railway/Render), así que REMOTE_ADDR es el proxy y hay que
+    # leer X-Forwarded-For: con NUM_PROXIES=1 DRF toma la ÚLTIMA dirección de la
+    # cadena, que es la que agrega el proxy y el cliente no puede falsear (si se
+    # dejara en None, DRF usaría la cadena entera, que sí es falseable con un
+    # header inventado y permitiría saltarse el límite). En desarrollo no hay
+    # proxy: 0 = usar REMOTE_ADDR y ignorar el header.
+    "NUM_PROXIES": int(env("NUM_PROXIES", "1")) if IS_PRODUCTION else 0,
 }
 
 # JWT (djangorestframework-simplejwt) — valores EXACTOS de docs/desarrollo.md
@@ -178,21 +294,28 @@ SIMPLE_JWT = {
 # Base del frontend público (receptor): con esto se arma el link del remito que
 # se le envía al receptor al despachar. La pantalla del receptor (tarea 3.4) vive
 # en la MISMA app de Vite que la del operador, en la ruta pública /remito/{token},
-# así que el default es el dev server de Vite.
-FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:5173")
+# así que en desarrollo el default es el dev server de Vite. En producción es
+# obligatoria: con el default, todos los emails saldrían con un link a localhost.
+FRONTEND_PUBLIC_URL = env_required_in_production(
+    "FRONTEND_PUBLIC_URL", "http://localhost:5173"
+)
 
 
 # Resend — emails transaccionales por API HTTP (secciones 1.1 y 2.1).
 # Si RESEND_API_KEY está vacía no se envía nada: el email queda en el log y la
 # operación que lo disparó (el despacho) se completa igual.
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+# En producción es obligatoria: sin ella no sale ningún email del sistema.
+RESEND_API_KEY = env_required_in_production("RESEND_API_KEY", "")
 # Casilla remitente. Resend solo deja enviar desde un dominio VERIFICADO en la cuenta;
 # mientras no haya uno, la única dirección disponible es onboarding@resend.dev, que
 # además solo puede escribirle al dueño de la cuenta de Resend (sirve para probar, no
 # para producción). Al verificar el dominio propio, basta con cambiar esta variable
 # (ej. remitos@friese.app). El nombre visible lo arma el código con el de la empresa
-# emisora (ver shipments/emails.py).
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+# emisora (ver shipments/emails.py). Obligatoria en producción justamente porque el
+# default solo le puede escribir al dueño de la cuenta de Resend.
+RESEND_FROM_EMAIL = env_required_in_production(
+    "RESEND_FROM_EMAIL", "onboarding@resend.dev"
+)
 
 
 # Horas que tienen que pasar desde el despacho, sin que el receptor abra el link,
@@ -200,7 +323,7 @@ RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 # El spec (sección 8, Fase 5) dice "X horas" sin definir X: 24 es una decisión de
 # esa tarea, confirmada con el usuario. Un día hábil completo de margen, y el
 # recordatorio sale a la misma hora del día que el despacho (no de madrugada).
-REMINDER_AFTER_HOURS = int(os.environ.get("REMINDER_AFTER_HOURS", "24"))
+REMINDER_AFTER_HOURS = int(env("REMINDER_AFTER_HOURS", "24"))
 
 
 # Tareas periódicas (django-crontab) — docs/desarrollo.md sección 6.
@@ -230,30 +353,91 @@ CRONJOBS = [
 
 
 # Cloudflare R2 — almacenamiento de las fotos de evidencia (secciones 1.1 y 2.1).
-# Es S3-compatible: se accede con boto3 contra el endpoint de la cuenta.
-R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
-R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
-R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
-R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "")
-R2_ENDPOINT_URL = os.environ.get(
+# Es S3-compatible: se accede con boto3 contra el endpoint de la cuenta. Las
+# credenciales son obligatorias en producción: sin ellas la subida de evidencia
+# (el corazón del producto) responde 502 en cada foto.
+R2_ACCOUNT_ID = env_required_in_production("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY = env_required_in_production("R2_ACCESS_KEY", "")
+R2_SECRET_KEY = env_required_in_production("R2_SECRET_KEY", "")
+R2_BUCKET_NAME = env_required_in_production("R2_BUCKET_NAME", "")
+R2_ENDPOINT_URL = env(
     "R2_ENDPOINT_URL", f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 )
-# Base de la URL que se guarda en Evidence.file_url. Por defecto es el endpoint S3,
-# que NO es accesible sin firmar: cuando el bucket tenga su dominio público (dev URL
-# de r2.dev o dominio propio) basta con setear R2_PUBLIC_BASE_URL en el env; el resto
-# del código no cambia.
-R2_PUBLIC_BASE_URL = os.environ.get(
+# Base de la URL que se guarda en Evidence.file_url. En desarrollo, si no se setea,
+# cae al endpoint S3, que NO es accesible sin firmar. En producción es obligatoria
+# y explícita (dominio propio del bucket, ver pendientes de la tarea 2.4): un
+# file_url mal formado deja la evidencia inaccesible para siempre.
+R2_PUBLIC_BASE_URL = env_required_in_production(
     "R2_PUBLIC_BASE_URL", f"{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}"
 )
 
 
 # CORS — permite al frontend (operador/receptor) consumir la API.
-# En dev se listan los orígenes locales; en prod se configuran vía env.
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.environ.get(
+# En dev se listan los orígenes locales; en prod es obligatoria (los dominios de
+# Vercel), porque con el default el frontend real no podría llamar a la API.
+CORS_ALLOWED_ORIGINS = split_csv(
+    env_required_in_production(
         "CORS_ALLOWED_ORIGINS",
         "http://localhost:3000,http://localhost:5173",
-    ).split(",")
-    if origin.strip()
-]
+    )
+)
+
+
+# --- Seguridad: HTTPS y headers (tarea 6.2) ---------------------------------
+
+# Headers que van SIEMPRE, en los dos ambientes: no dependen de HTTPS, así que
+# activarlos en desarrollo no rompe nada. Coinciden con los defaults de Django
+# 5.1, pero se dejan explícitos para que estén a la vista y no cambien solos si
+# un día cambia el default.
+SECURE_CONTENT_TYPE_NOSNIFF = True  # X-Content-Type-Options: nosniff
+X_FRAME_OPTIONS = "DENY"  # X-Frame-Options: nadie puede embebernos en un iframe
+SECURE_REFERRER_POLICY = "same-origin"  # el token del link no viaja a terceros
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+# HTTPS forzado — SOLO en producción. En desarrollo el server es http://localhost
+# y cualquiera de estas opciones dejaría la app inaccesible (redirect a un https
+# que no existe, o cookies que el browser nunca manda).
+SECURE_SSL_REDIRECT = IS_PRODUCTION  # todo http:// se redirige a https://
+SESSION_COOKIE_SECURE = IS_PRODUCTION  # la sesión del admin, solo por HTTPS
+CSRF_COOKIE_SECURE = IS_PRODUCTION
+
+if IS_PRODUCTION:
+    # El TLS lo termina el proxy de la plataforma (Railway/Render) y la request
+    # llega a Django por http: sin esto, Django la ve como insegura y
+    # SECURE_SSL_REDIRECT la redirige a https… que vuelve a entrar igual → loop
+    # infinito. Es seguro confiar en el header porque estas plataformas SIEMPRE
+    # lo reescriben; detrás de un proxy que no lo haga, no habría que usarlo.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# HSTS: le dice al browser que a este dominio solo se entra por HTTPS, sin
+# esperar al redirect (ni siquiera la primera request del día viaja en claro).
+# Configurable por env para poder arrancar con un valor chico (ej. 3600) los
+# primeros días de producción: mientras el header esté vigente, un browser que
+# ya lo recibió NO va a poder entrar por http aunque se apague acá.
+# PRELOAD queda en False: el preload de Chrome exige inscribir el dominio en una
+# lista y sacarlo después lleva meses; no se declara algo que no se hizo.
+SECURE_HSTS_SECONDS = int(env("SECURE_HSTS_SECONDS", "31536000")) if IS_PRODUCTION else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = IS_PRODUCTION
+SECURE_HSTS_PRELOAD = False
+
+# Orígenes en los que Django confía para un POST con CSRF (form del admin). Con
+# HTTPS forzado el admin se sirve por https y Django compara el Origin/Referer
+# contra esta lista: si queda vacía, el login del admin falla la validación de
+# CSRF. Por eso en producción, si no se setea la variable, se deriva de
+# ALLOWED_HOSTS asumiendo https (que es lo único que se acepta).
+CSRF_TRUSTED_ORIGINS = split_csv(env("CSRF_TRUSTED_ORIGINS")) or (
+    [f"https://{host}" for host in ALLOWED_HOSTS if "*" not in host]
+    if IS_PRODUCTION
+    else []
+)
+
+
+# --- Chequeo final de configuración -----------------------------------------
+# Se corre al importar los settings, así que si falta algo el proceso no arranca
+# (ni runserver, ni gunicorn, ni un management command del cron).
+if MISSING_ENV_VARS:
+    raise ImproperlyConfigured(
+        f"Faltan variables de entorno obligatorias (DJANGO_ENV={DJANGO_ENV}): "
+        + ", ".join(MISSING_ENV_VARS)
+        + ". Están documentadas en .env.example."
+    )

@@ -26,6 +26,7 @@ from .serializers import (
     ShipmentSerializer,
 )
 from .storage import upload_evidence_file
+from .throttling import PUBLIC_THROTTLES
 
 # Ventana de respuesta del receptor: response_deadline = link_opened_at + 48 horas
 # (docs/desarrollo.md sección 6). Valor fijo del spec.
@@ -255,11 +256,15 @@ class PublicShipmentView(generics.RetrieveAPIView):
     authentication_classes vacío a propósito: la config global usa JWT y, si el
     navegador del receptor mandara un Authorization inválido, la request moriría en un
     401 antes de llegar acá. Este endpoint es público y no mira credenciales.
+
+    Al no haber auth, el cupo de requests por IP es lo único que separa a un receptor
+    de un script: ver shipments/throttling.py (tarea 6.2).
     """
 
     serializer_class = PublicShipmentSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = PUBLIC_THROTTLES
     lookup_field = "public_token"
     lookup_url_kwarg = "token"
 
@@ -307,10 +312,14 @@ class PublicShipmentResponseView(APIView):
     SIN autenticación, igual que PublicShipmentView: la única credencial es el
     public_token del link. authentication_classes vacío para que un Authorization
     inválido del navegador no convierta la request en un 401.
+
+    El cupo por IP de la tarea 6.2 lo heredan las tres vistas de respuesta (subir
+    foto, aceptar, disputar), que son las que además escriben en la DB y en R2.
     """
 
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = PUBLIC_THROTTLES
 
     def get_shipment(self, token):
         return get_object_or_404(public_shipment_queryset(), public_token=token)
