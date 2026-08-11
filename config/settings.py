@@ -182,19 +182,49 @@ SIMPLE_JWT = {
 FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:5173")
 
 
+# Resend — emails transaccionales por API HTTP (secciones 1.1 y 2.1).
+# Si RESEND_API_KEY está vacía no se envía nada: el email queda en el log y la
+# operación que lo disparó (el despacho) se completa igual.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+# Casilla remitente. Resend solo deja enviar desde un dominio VERIFICADO en la cuenta;
+# mientras no haya uno, la única dirección disponible es onboarding@resend.dev, que
+# además solo puede escribirle al dueño de la cuenta de Resend (sirve para probar, no
+# para producción). Al verificar el dominio propio, basta con cambiar esta variable
+# (ej. remitos@friese.app). El nombre visible lo arma el código con el de la empresa
+# emisora (ver shipments/emails.py).
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+
+
+# Horas que tienen que pasar desde el despacho, sin que el receptor abra el link,
+# para mandarle el recordatorio (tarea 5.2, comando send_pending_reminders).
+# El spec (sección 8, Fase 5) dice "X horas" sin definir X: 24 es una decisión de
+# esa tarea, confirmada con el usuario. Un día hábil completo de margen, y el
+# recordatorio sale a la misma hora del día que el despacho (no de madrugada).
+REMINDER_AFTER_HOURS = int(os.environ.get("REMINDER_AFTER_HOURS", "24"))
+
+
 # Tareas periódicas (django-crontab) — docs/desarrollo.md sección 6.
-# Cierre automático: los remitos despachados cuya ventana de respuesta de 48hs
-# venció sin respuesta del receptor pasan a 'accepted'. Se corre cada 15 minutos
-# (el spec fija la ventana de 48hs, no la frecuencia del chequeo): así el remito
-# se cierra a lo sumo 15 minutos después de vencer, y la query es una sola sobre
-# los remitos en 'dispatched'.
-# Se registra en el cron del sistema con `python manage.py crontab add` (y se
-# quita con `crontab remove`) al deployar — requiere un host Linux con cron.
+# Se registran en el cron del sistema con `python manage.py crontab add` (y se
+# quitan con `crontab remove`) al deployar — requiere un host Linux con cron.
+#
+# 1) Cierre automático: los remitos despachados cuya ventana de respuesta de 48hs
+#    venció sin respuesta del receptor pasan a 'accepted'. Se corre cada 15 minutos
+#    (el spec fija la ventana de 48hs, no la frecuencia del chequeo): así el remito
+#    se cierra a lo sumo 15 minutos después de vencer, y la query es una sola sobre
+#    los remitos en 'dispatched'.
+# 2) Recordatorio: los remitos despachados hace más de REMINDER_AFTER_HOURS cuyo
+#    link nunca se abrió. Se corre cada hora: con un umbral medido en horas, afinar
+#    más el minuto exacto del envío no aporta nada y evita una query de más.
 CRONJOBS = [
     (
         "*/15 * * * *",
         "django.core.management.call_command",
         ["close_expired_shipments"],
+    ),
+    (
+        "0 * * * *",
+        "django.core.management.call_command",
+        ["send_pending_reminders"],
     ),
 ]
 

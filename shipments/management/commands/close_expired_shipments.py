@@ -4,6 +4,8 @@ Regla de la sección 6 de docs/desarrollo.md: pasadas las 48hs desde la primera
 apertura del link (response_deadline), si el receptor no aceptó ni disputó, el
 sistema cierra el remito como `accepted`.
 
+Cerrado el remito, se le confirma el cierre al receptor por email (tarea 5.4).
+
 Se corre como tarea periódica con django-crontab (CRONJOBS en config/settings.py)
 y también a mano:
 
@@ -15,6 +17,7 @@ import logging
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from shipments.emails import send_auto_close_email
 from shipments.models import Shipment
 
 logger = logging.getLogger(__name__)
@@ -33,14 +36,20 @@ class Command(BaseCommand):
         # calcula en la primera apertura del link, tarea 3.1) y vencida. Un remito
         # cuyo link nunca se abrió tiene response_deadline null: su ventana no
         # empezó a correr, así que NO se cierra.
-        candidates = Shipment.objects.filter(
-            status=Shipment.DISPATCHED,
-            response_deadline__isnull=False,
-            response_deadline__lte=now,
-        ).order_by("pk")
+        # Se materializa la lista (con la empresa, que usa el email) antes de empezar
+        # a cerrar: el UPDATE toca el status, que es parte del propio filtro.
+        candidates = list(
+            Shipment.objects.filter(
+                status=Shipment.DISPATCHED,
+                response_deadline__isnull=False,
+                response_deadline__lte=now,
+            )
+            .select_related("company")
+            .order_by("pk")
+        )
 
         closed_ids = []
-        for shipment_id in candidates.values_list("pk", flat=True):
+        for shipment in candidates:
             # La condición status=dispatched viaja DENTRO del UPDATE, igual que en
             # la respuesta del receptor (views.close_response): si el receptor
             # acepta o disputa justo entre el SELECT y el UPDATE, acá se actualizan
@@ -49,10 +58,19 @@ class Command(BaseCommand):
             # auto_closed marca que la conformidad es por silencio del receptor, no
             # expresa: es lo que después permite medir cuántos clientes no responden.
             updated = Shipment.objects.filter(
-                pk=shipment_id, status=Shipment.DISPATCHED
+                pk=shipment.pk, status=Shipment.DISPATCHED
             ).update(status=Shipment.ACCEPTED, auto_closed=True)
-            if updated:
-                closed_ids.append(shipment_id)
+            if not updated:
+                continue
+
+            closed_ids.append(shipment.pk)
+            shipment.status = Shipment.ACCEPTED
+            shipment.auto_closed = True
+            # El cierre ya está commiteado (el comando corre en autocommit), así que
+            # el email nunca puede voltearlo; `send_auto_close_email` tampoco levanta
+            # excepciones: una falla de Resend queda en el log y el remito sigue
+            # cerrado (tarea 5.4). No se reintenta.
+            send_auto_close_email(shipment)
 
         if closed_ids:
             logger.info(

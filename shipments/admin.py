@@ -80,8 +80,16 @@ class ShipmentAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
     # puntual, que los rangos fijos de list_filter no alcanzan.
     date_hierarchy = "created_at"
     search_fields = ("receiver_name", "receiver_email")
-    # Autogenerados o escritos por el receptor / la tarea periódica: no editables a mano.
-    readonly_fields = ("public_token", "created_at", "dispute_reason", "auto_closed")
+    # Autogenerados o escritos por el receptor / las tareas periódicas: no editables
+    # a mano. reminder_sent_at lo escribe solo send_pending_reminders (tarea 5.2);
+    # tocarlo desde acá mandaría (o suprimiría) un recordatorio.
+    readonly_fields = (
+        "public_token",
+        "created_at",
+        "dispute_reason",
+        "auto_closed",
+        "reminder_sent_at",
+    )
     autocomplete_fields = ("company", "operator")
     inlines = (ShipmentItemInline, EvidenceInline)
 

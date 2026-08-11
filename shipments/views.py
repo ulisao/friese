@@ -13,6 +13,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .emails import send_dispute_email
 from .models import Evidence, Shipment, ShipmentItem
 from .serializers import (
     DisputeSerializer,
@@ -423,6 +424,8 @@ class PublicShipmentDisputeView(PublicShipmentResponseView):
     cierra la queja. Se exige al menos una foto de recepción, porque la sección 5
     define el endpoint como "registra queja con foto". `dispute_reason` es un texto
     opcional que explica el reclamo.
+
+    Registrada la queja, se le avisa por email al admin de la empresa (tarea 5.3).
     """
 
     def post(self, request, token):
@@ -441,5 +444,11 @@ class PublicShipmentDisputeView(PublicShipmentResponseView):
 
         with transaction.atomic():
             self.close_response(shipment, Shipment.DISPUTED, dispute_reason=reason)
+            # El aviso sale recién cuando la queja está commiteada: si la
+            # transacción se revierte, el admin no recibe un email por una queja
+            # que nunca quedó registrada. send_dispute_email() no levanta
+            # excepciones (ver shipments/emails.py), así que un fallo de Resend no
+            # puede convertir en 500 una queja ya guardada.
+            transaction.on_commit(lambda: send_dispute_email(shipment))
 
         return Response(PublicShipmentSerializer(shipment).data)

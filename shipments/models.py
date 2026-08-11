@@ -45,6 +45,11 @@ class Shipment(models.Model):
     # conformidad expresa del silencio del cliente. Lo escribe únicamente la tarea
     # periódica close_expired_shipments.
     auto_closed = models.BooleanField(default=False)
+    # Momento en que se le mandó al receptor el recordatorio por no haber abierto el
+    # link (tarea 5.2). Null = todavía no se le mandó. Es la marca que garantiza que
+    # el recordatorio salga UNA SOLA VEZ, por más veces que corra la tarea periódica.
+    # Lo escribe únicamente el comando send_pending_reminders.
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Shipment #{self.pk} ({self.get_status_display()})"
