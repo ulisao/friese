@@ -7,7 +7,9 @@ import { ShipmentsPage } from '@/pages/ShipmentsPage'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { isBootstrapping, useAuthStore } from '@/store/auth'
 import { lazy, Suspense } from 'react'
-const PublicShipmentPage = lazy(() => import('@/pages/PublicShipmentPage'))
+const PublicShipmentPage = lazy(() =>
+  import('@/pages/PublicShipmentPage').then((module) => ({ default: module.PublicShipmentPage }))
+)
 
 export default function App() {
   const bootstrapping = useAuthStore(isBootstrapping)
