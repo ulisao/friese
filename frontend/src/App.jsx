@@ -2,11 +2,12 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { LoginPage } from '@/pages/LoginPage'
 import { NewShipmentPage } from '@/pages/NewShipmentPage'
-import { PublicShipmentPage } from '@/pages/PublicShipmentPage'
 import { ShipmentDetailPage } from '@/pages/ShipmentDetailPage'
 import { ShipmentsPage } from '@/pages/ShipmentsPage'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { isBootstrapping, useAuthStore } from '@/store/auth'
+import { lazy, Suspense } from 'react'
+const PublicShipmentPage = lazy(() => import('@/pages/PublicShipmentPage'))
 
 export default function App() {
   const bootstrapping = useAuthStore(isBootstrapping)
@@ -27,8 +28,14 @@ export default function App() {
 
       {/* Pantalla del receptor: pública, sin login. Es la ruta que arma
           emails.build_public_link() con el public_token del remito. */}
-      <Route path="/remito/:token" element={<PublicShipmentPage />} />
-
+<Route
+  path="/remito/:token"
+  element={
+    <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando…</p>}>
+      <PublicShipmentPage />
+    </Suspense>
+  }
+/>
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<ShipmentsPage />} />
         <Route path="/remitos/nuevo" element={<NewShipmentPage />} />
