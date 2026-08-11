@@ -258,6 +258,15 @@ export function PublicShipmentPage() {
       {/* Una sola columna, centrada (docs/diseno.md sección 5, frontend receptor). */}
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-6 pb-10">
         <header className="flex flex-col items-center gap-2 text-center">
+          {/* Momento de marca: el receptor no conoce Friese y llega acá desde un email.
+              Es el único dorado de la pantalla (docs/diseno.md sección 2). */}
+          <img
+            src="/friese-mark.png"
+            alt="Friese"
+            width="40"
+            height="40"
+            className="size-10"
+          />
           <p className="text-sm text-muted-foreground">{shipment.company_name}</p>
           <h1 className="text-2xl font-semibold">Remito #{shipment.id}</h1>
           <p className="text-sm text-muted-foreground">Para {shipment.receiver_name}</p>
@@ -459,7 +468,7 @@ export function PublicShipmentPage() {
                 type="button"
                 data-testid="dispute-confirm"
                 disabled={!hasUploadedPhoto || hasUnconfirmedPhotos || submitting !== null}
-                className="h-14 w-full bg-red-500 text-base font-semibold text-white hover:bg-red-500/90"
+                className="h-14 w-full bg-red-500 text-base font-semibold text-background hover:bg-red-500/90"
                 onClick={() => respond('dispute')}
               >
                 {submitting === 'dispute' ? 'Enviando…' : 'Enviar el reporte'}
@@ -519,7 +528,8 @@ export function PublicShipmentPage() {
         )}
 
         {/* Los dos CTA, diferenciados por el color de estado: verde = accepted,
-            rojo = disputed (docs/diseno.md secciones 2 y 5). */}
+            rojo = disputed (docs/diseno.md secciones 2 y 5). Los dos llevan el texto
+            en el fondo base oscuro: sobre red-500 el blanco da 3.81, bajo WCAG AA. */}
         {canRespond && !reporting && (
           <div className="flex flex-col gap-3">
             <Button
@@ -538,7 +548,7 @@ export function PublicShipmentPage() {
               type="button"
               data-testid="report"
               disabled={submitting !== null}
-              className="h-14 w-full bg-red-500 text-base font-semibold text-white hover:bg-red-500/90"
+              className="h-14 w-full bg-red-500 text-base font-semibold text-background hover:bg-red-500/90"
               onClick={() => {
                 setActionError(null)
                 setReporting(true)

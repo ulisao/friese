@@ -255,7 +255,9 @@ export function NewShipmentPage() {
                             onClick={() => setSelectedProductId(product.id)}
                           >
                             <span className="truncate">{product.name}</span>
-                            <span className="text-xs opacity-70">{product.unit}</span>
+                            {/* opacity-90, no 70: con el producto seleccionado el botón
+                                es indigo y el blanco al 70% caía a 3.92 (WCAG AA pide 4.5). */}
+                            <span className="text-xs opacity-90">{product.unit}</span>
                           </Button>
                         </li>
                       ))}

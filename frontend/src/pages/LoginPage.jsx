@@ -48,8 +48,18 @@ export function LoginPage() {
   return (
     <main className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold">Friese</CardTitle>
+        {/* Momento de marca: el logo completo (marca + tipografía), el único lugar de
+            la app del operador donde aparece el dorado (docs/diseno.md sección 2).
+            El <h1> queda para lectores de pantalla: el nombre lo dice la imagen. */}
+        <CardHeader className="justify-items-center text-center">
+          <img
+            src="/friese-logo.png"
+            alt="Friese"
+            width="96"
+            height="99"
+            className="mx-auto w-24"
+          />
+          <CardTitle className="sr-only">Friese</CardTitle>
           <CardDescription>Ingresá con tu usuario de operador.</CardDescription>
         </CardHeader>
 

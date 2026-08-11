@@ -10,7 +10,9 @@ function Card({
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
+        // rounded-lg (8px) y shadow-sm: docs/diseno.md sección 4. El default de shadcn
+        // es rounded-xl (12px) y dejaba la card del login distinta al resto de la app.
+        "flex flex-col gap-6 rounded-lg border bg-card py-6 text-card-foreground shadow-sm",
         className
       )}
       {...props} />
