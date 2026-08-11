@@ -13,6 +13,9 @@ dj-database-url==3.1.2
 # Infra web
 django-cors-headers==4.9.0
 whitenoise==6.12.0
+# Servidor WSGI de producción (runserver no sirve para deploy). Solo se usa en
+# Railway; en desarrollo se sigue usando `manage.py runserver`.
+gunicorn==23.0.0
 
 # Entorno
 python-dotenv==1.2.2
