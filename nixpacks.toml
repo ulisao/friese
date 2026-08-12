@@ -1,4 +1,4 @@
-# Paquetes extra del contenedor que construye Railway (tarea 7.1).
+# Paquetes del contenedor que construye Railway (tarea 7.1).
 #
 # `postgresql_17` está solo por el binario `pg_dump`, que necesita el cron de backup
 # (`manage.py backup_database`). La base de Supabase corre PostgreSQL 17.6 y pg_dump
@@ -6,8 +6,22 @@
 # suelta: con el paquete `postgresql` a secas, el día que nixpkgs mueva el default el
 # backup empieza a fallar sin que nadie haya tocado nada.
 #
-# El "..." mantiene los paquetes que nixpacks detecta solo (Python y compañía): sin
-# él, esta lista los REEMPLAZA y el build se queda sin intérprete.
+# POR QUÉ LA LISTA ES EXPLÍCITA Y NO EMPIEZA CON "...":
+# nixpacks detecta solo `python313`, `postgresql_16.dev` y `gcc` — el Postgres 16 lo
+# agrega al ver `psycopg` en requirements.txt, para poder compilarlo desde fuente.
+# Con "..." esos tres se conservan y `postgresql_17` se SUMA, y ahí el build muere:
+#
+#   error: collision between `postgresql-17.0/bin/pg_config'
+#                        and `postgresql-16.4-dev/bin/pg_config'
+#
+# Los dos paquetes traen `bin/pg_config` y Nix no arma un perfil con archivos
+# repetidos. Por eso acá el 16 se REEMPLAZA por el 17 en vez de convivir con él.
+# Sacarlo no rompe nada: el proyecto usa `psycopg[binary]`, que instala una wheel con
+# su propia libpq adentro y nunca compila, así que no necesita los headers del 16.
+#
+# CONTRAPARTIDA: al no usar "...", esta lista es la lista completa y hay que
+# mantenerla a mano. Si algún día cambia `.python-version` (hoy 3.13), hay que mover
+# `python313` acá también, o el build se queda con el intérprete viejo.
 #
 # Este archivo aplica a los cuatro servicios que comparten el repo (web + los tres
 # crons). Solo el de backup usa pg_dump; los demás cargan con unos MB de más en la
@@ -18,4 +32,4 @@
 # que sí lo tenga (ver BACKUP.md).
 
 [phases.setup]
-nixPkgs = ["...", "postgresql_17"]
+nixPkgs = ["python313", "gcc", "postgresql_17"]

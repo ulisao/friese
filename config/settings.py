@@ -454,7 +454,7 @@ BACKUP_CONNECT_TIMEOUT_SECONDS = int(env("BACKUP_CONNECT_TIMEOUT_SECONDS", "30")
 # desde un endpoint público, sin sesión— con ella no se pueden borrar los backups.
 # Las claves caen a las de la app solo para poder probar el comando en desarrollo sin
 # configurar un segundo token; en producción se setean las propias.
-R2_BACKUP_BUCKET_NAME = env("R2_BACKUP_BUCKET_NAME", "friese-backups")
+R2_BACKUP_BUCKET_NAME = env("R2_BACKUP_BUCKET_NAME", "friese-backup")
 R2_BACKUP_ACCESS_KEY = env("R2_BACKUP_ACCESS_KEY") or R2_ACCESS_KEY
 R2_BACKUP_SECRET_KEY = env("R2_BACKUP_SECRET_KEY") or R2_SECRET_KEY
 R2_BACKUP_PREFIX = env("R2_BACKUP_PREFIX", "db")
