@@ -571,7 +571,9 @@ def phase_emails():
         print(f"  - {e.get('created_at')} | -> {e.get('to')} | {e.get('last_event')} | "
               f"{(e.get('subject') or '')[:70]}")
 
-    delivered = {"sent", "delivered", "opened", "clicked"}
+    # `queued` es un estado transitorio normal (Resend todavía no lo despachó):
+    # lo que importa es que ninguno esté en bounced/complained/failed.
+    delivered = {"queued", "sent", "delivered", "opened", "clicked"}
     despacho = [e for e in mine if "confirmá la recepción" in (e.get("subject") or "")
                 or "confirm" in (e.get("subject") or "").lower()]
     check(len(despacho) >= 3, "salieron los 3 emails de despacho al receptor", f"{len(despacho)}")
@@ -587,8 +589,13 @@ def phase_emails():
     check(any(COMPANY_ADMIN_EMAIL in (e.get("to") or []) for e in queja),
           "el aviso de queja fue al email del admin de la empresa")
 
+    # El email de cierre solo existe si antes se corrieron las fases `expire` y
+    # `cron`: si no, no hubo ningún remito cerrado por silencio en esta corrida.
     cierre = [e for e in mine if "cerrado" in (e.get("subject") or "").lower()]
-    check(len(cierre) >= 1, "salió el email de cierre automático al receptor", f"{len(cierre)}")
+    if state.get("expired_at"):
+        check(len(cierre) >= 1, "salió el email de cierre automático al receptor", f"{len(cierre)}")
+    else:
+        print("  (se saltea el email de cierre: no se corrieron las fases `expire`/`cron`)")
 
     # El contenido de CADA email de despacho tiene que traer el link único del
     # remito que anuncia: se saca el número del asunto y se compara contra el
