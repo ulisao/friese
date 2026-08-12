@@ -36,6 +36,23 @@ from shipments.models import Evidence  # noqa: E402
 ok = 0
 fallas = []
 
+# El dev URL de R2 (`pub-….r2.dev`) rechaza con 403 los User-Agent que parecen bot:
+# con el de urllib da 403 y con uno de navegador da 200. No es un problema del bucket
+# ni de la foto — verificado contra fotos que este script no toca.
+UA_NAVEGADOR = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120"
+
+
+def pedir_url_publica(url):
+    """(status, cuerpo) del file_url, como lo pediría el navegador del receptor."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA_NAVEGADOR})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, b""
+    except Exception as exc:  # noqa: BLE001
+        return f"ERR {exc}", b""
+
 
 def check(descripcion, condicion, detalle=""):
     global ok
@@ -110,13 +127,7 @@ print(f"  (si algo se rompe de acá en más: python manage.py backup_evidence --
 origen.delete_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
 check("la foto ya NO está en el bucket principal", key not in eb.list_source())
 
-try:
-    with urllib.request.urlopen(evidencia.file_url, timeout=20) as resp:
-        estado = resp.status
-except urllib.error.HTTPError as exc:
-    estado = exc.code
-except Exception as exc:  # noqa: BLE001
-    estado = f"ERR {exc}"
+estado, _ = pedir_url_publica(evidencia.file_url)
 check("el file_url de la base ahora da 404", estado == 404, f"dio {estado}")
 
 reporte = eb.audit()
@@ -146,12 +157,7 @@ check(
     f"{recuperada.get('ContentType')} contra {content_type_original}",
 )
 
-try:
-    with urllib.request.urlopen(evidencia.file_url, timeout=20) as resp:
-        estado = resp.status
-        cuerpo = resp.read()
-except Exception as exc:  # noqa: BLE001
-    estado, cuerpo = f"ERR {exc}", b""
+estado, cuerpo = pedir_url_publica(evidencia.file_url)
 check("el file_url de la base vuelve a servir la foto", estado == 200, f"dio {estado}")
 check("lo que sirve la URL pública es byte a byte la original", cuerpo == original)
 

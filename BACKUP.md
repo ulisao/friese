@@ -237,10 +237,21 @@ Lo que hay que configurar una sola vez para que el backup empiece a correr.
    - **Specify bucket** → solo `friese-backup`
 3. Guardar el Access Key ID y el Secret Access Key.
 
-> El token que usa la app para subir fotos (`R2_ACCESS_KEY`) está scopeado a
-> `friese-evidence` y **no puede** crear buckets ni tocar este. Es a propósito: ese
-> token vive en un backend que expone endpoints públicos sin sesión, y si se filtra no
-> tiene que alcanzar para borrar los backups.
+> **OJO — esto todavía NO es cierto y hay que arreglarlo** (detectado el 2026-08-12 al
+> hacer la 7.2). La intención del diseño es que el token que usa la app para subir
+> fotos (`R2_ACCESS_KEY`) esté scopeado a `friese-evidence` y no pueda tocar los
+> buckets de backup: ese token vive en un backend con endpoints públicos sin sesión, y
+> si se filtra no tiene que alcanzar para borrar las copias.
+>
+> Medido contra la cuenta real, ese token tiene **Object Read & Write sobre los TRES
+> buckets**: puede listar, escribir y **borrar** en `friese-backup` y en
+> `friese-evidence-backup`. O sea que hoy una sola credencial filtrada alcanza para
+> destruir los datos y sus dos copias.
+>
+> **Cómo arreglarlo:** R2 → Manage API Tokens → crear un token nuevo con **Object Read
+> & Write** y **Specify bucket → solo `friese-evidence`**, reemplazar `R2_ACCESS_KEY` /
+> `R2_SECRET_KEY` en Railway y en `.env`, y borrar el token viejo. Los tokens de los dos
+> backups sí están bien scopeados (verificado: cada uno solo ve su propio bucket).
 
 ### 4.2 — Variables en Railway
 
@@ -509,3 +520,6 @@ python smoke_tests/evidence_backup.py
 - **Un borrado con la credencial del respaldo.** El token del respaldo puede borrar su
   propio bucket. La protección es que ese token solo vive en los dos crons, no en la
   API pública.
+- **Un borrado con la credencial de la APP.** Hoy `R2_ACCESS_KEY` puede borrar los tres
+  buckets, así que esa protección todavía no existe de verdad. Ver el aviso de la
+  [sección 4.1](#41--bucket-y-token-en-cloudflare): hay que re-scopear ese token.

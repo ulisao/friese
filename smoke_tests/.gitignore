@@ -4,3 +4,8 @@ state.json
 # Capturas de pantalla de la corrida: evidencia de un run puntual, no del repo.
 shots/
 __pycache__/
+
+# Copia local de seguridad que baja `evidence_restore_real.py` antes de borrar la foto
+# de prueba. El script la borra al terminar; queda solo si la corrida se cortó a la
+# mitad, y en ese caso es una foto real de un cliente: no va a git.
+.restore-backup/
