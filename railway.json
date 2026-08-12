@@ -5,7 +5,7 @@
     "buildCommand": "python manage.py collectstatic --noinput"
   },
   "deploy": {
-    "preDeployCommand": "python manage.py migrate --noinput",
+    "preDeployCommand": "python manage.py migrate --noinput && python manage.py createcachetable",
     "startCommand": "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --access-logfile - --error-logfile -",
     "numReplicas": 1,
     "restartPolicyType": "ON_FAILURE",

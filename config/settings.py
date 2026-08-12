@@ -250,6 +250,36 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
+# Cache — lo usa el rate limiting de los endpoints públicos (tarea 6.2) para
+# contar las requests de cada IP.
+#
+# Va en la BASE y no en el default (memoria del proceso) porque el contador tiene
+# que ser UNO SOLO para todo el backend: el smoke test de la 6.6 midió que en
+# producción pasaban ~120 requests por minuto contra un cupo de 30/min, porque
+# gunicorn corre varios workers y cada uno llevaba su propia cuenta en su propia
+# memoria (30 x 4 workers). Con el cache en la base los workers comparten el
+# contador y el cupo vale lo que dice `DEFAULT_THROTTLE_RATES`. De paso, el
+# contador sobrevive a los deploys (antes se reiniciaba en cada uno).
+#
+# La tabla se crea con `python manage.py createcachetable` (es idempotente: si ya
+# existe, no hace nada). NO la crea `migrate`, así que va en el comando previo al
+# deploy — ver railway.json.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": env("CACHE_TABLE", "friese_cache_table"),
+        "OPTIONS": {
+            # Default de Django: 300 entradas, y al llegar borra un tercio. Cada IP
+            # que toca el endpoint público ocupa una entrada, así que con el default
+            # una ráfaga desde muchas IPs podría descartar contadores vigentes —
+            # justo lo que el límite tiene que sostener. 10k entradas es holgado y
+            # la tabla se limpia sola.
+            "MAX_ENTRIES": int(env("CACHE_MAX_ENTRIES", "10000")),
+        },
+    }
+}
+
+
 # DRF — autenticación por JWT por defecto.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

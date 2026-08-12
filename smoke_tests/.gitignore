@@ -1,0 +1,6 @@
+# Estado de la corrida: lleva credenciales de los usuarios temporales del smoke
+# test (se borran en la fase `cleanup`, pero no tienen por qué quedar en git).
+state.json
+# Capturas de pantalla de la corrida: evidencia de un run puntual, no del repo.
+shots/
+__pycache__/
