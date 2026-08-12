@@ -289,18 +289,30 @@ def phase_operator():
     }, timeout=30)
     check(r.status_code == 400, "reusar el token del QR es rechazado", f"HTTP {r.status_code}")
 
-    # 2) Login del operador (individual, usuario + contraseña).
-    r = requests.post(f"{API}/auth/login/", json={"username": op_username, "password": op_password},
-                      timeout=30)
+    # 2) Login del operador (individual, usuario + contraseña). Desde la 6.7 el
+    #    refresh token NO viene en el cuerpo: viaja en una cookie httpOnly, así
+    #    que hace falta una Session para que el cliente la conserve.
+    sesion = requests.Session()
+    r = sesion.post(f"{API}/auth/login/", json={"username": op_username, "password": op_password},
+                    timeout=30)
     check(r.status_code == 200 and "access" in r.json(), "login del operador contra producción",
           f"HTTP {r.status_code}")
-    tokens = r.json()
-    auth = {"Authorization": f"Bearer {tokens['access']}"}
+    check("refresh" not in r.json(), "el refresh no viaja en el cuerpo (va en la cookie, 6.7)")
+    auth = {"Authorization": f"Bearer {r.json()['access']}"}
+    cookie_vieja = sesion.cookies.get(settings.REFRESH_COOKIE_NAME)
+    check(bool(cookie_vieja), "el login dejó la cookie del refresh")
 
-    r = requests.post(f"{API}/auth/refresh/", json={"refresh": tokens["refresh"]}, timeout=30)
-    check(r.status_code == 200 and "access" in r.json(), "el refresh del JWT rota el token",
-          f"HTTP {r.status_code}")
-    r = requests.post(f"{API}/auth/refresh/", json={"refresh": tokens["refresh"]}, timeout=30)
+    r = sesion.post(f"{API}/auth/refresh/", timeout=30)
+    check(r.status_code == 200 and "access" in r.json(),
+          "el refresh renueva el access tomando el token de la cookie", f"HTTP {r.status_code}")
+    check(sesion.cookies.get(settings.REFRESH_COOKIE_NAME) != cookie_vieja,
+          "la cookie trae un refresh NUEVO: la rotación sigue activa")
+
+    # El refresh anterior quedó blacklisteado: se lo manda a mano en una sesión
+    # limpia para comprobarlo.
+    otra = requests.Session()
+    otra.cookies.set(settings.REFRESH_COOKIE_NAME, cookie_vieja, domain="api.friese.com.ar")
+    r = otra.post(f"{API}/auth/refresh/", timeout=30)
     check(r.status_code == 401, "el refresh viejo queda invalidado (blacklist)",
           f"HTTP {r.status_code}")
 
