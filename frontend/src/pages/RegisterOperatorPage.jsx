@@ -65,7 +65,7 @@ export function RegisterOperatorPage() {
     // en vez de dejarlo trabado en esta pantalla.
     try {
       const { data } = await login({ username, password })
-      setSession({ access: data.access, refresh: data.refresh, username })
+      setSession({ access: data.access, username })
       navigate('/', { replace: true })
     } catch {
       navigate('/login', { replace: true })

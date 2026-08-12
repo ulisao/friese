@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { api } from '@/lib/api'
+import { api, logout } from '@/lib/api'
 import { SHIPMENT_STATUSES, getShipmentStatus } from '@/lib/shipmentStatus'
 import { useAuthStore } from '@/store/auth'
 
@@ -34,6 +34,21 @@ function formatDate(value) {
 export function ShipmentsPage() {
   const username = useAuthStore((state) => state.username)
   const clearSession = useAuthStore((state) => state.clearSession)
+
+  /*
+   * Salir no es solo olvidar el token acá: hay que avisarle al backend para que
+   * blacklistee el refresh y borre la cookie httpOnly (tarea 6.7). Si esa llamada
+   * falla igual se cierra la sesión local: dejar al operador adentro porque no
+   * había red sería lo peor de los dos mundos.
+   */
+  async function handleLogout() {
+    try {
+      await logout()
+    } catch {
+      /* la sesión local se cierra igual */
+    }
+    clearSession()
+  }
 
   const [shipments, setShipments] = useState([])
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'error'
@@ -65,7 +80,7 @@ export function ShipmentsPage() {
             <h1 className="text-xl font-semibold">Remitos</h1>
             <p className="truncate text-sm text-muted-foreground">Operador: {username}</p>
           </div>
-          <Button variant="outline" className="h-12" onClick={clearSession}>
+          <Button variant="outline" className="h-12" onClick={handleLogout}>
             Salir
           </Button>
         </div>

@@ -69,8 +69,13 @@ class Browser:
 
         self.ws = websocket.create_connection(ws_url, suppress_origin=True, timeout=60)
         self._id = 0
+        # Los eventos que llegan mientras se espera una respuesta se guardan acá:
+        # sirven para leer los errores de la consola (p. ej. las violaciones de CSP,
+        # que el navegador reporta ahí y no rompen la página).
+        self.eventos = []
         self.send("Page.enable")
         self.send("Runtime.enable")
+        self.send("Log.enable")
         if mobile:
             self.send("Emulation.setDeviceMetricsOverride", {
                 "width": 390, "height": 844, "deviceScaleFactor": 2, "mobile": True,
@@ -85,6 +90,21 @@ class Browser:
                 if "error" in msg:
                     raise RuntimeError(f"{method}: {msg['error']}")
                 return msg.get("result", {})
+            if msg.get("method") in ("Log.entryAdded", "Runtime.consoleAPICalled"):
+                self.eventos.append(msg)
+
+    def errores_de_consola(self):
+        """Mensajes de error de la consola (incluidas las violaciones de CSP)."""
+        salida = []
+        for evento in self.eventos:
+            params = evento.get("params", {})
+            entrada = params.get("entry", {})
+            if entrada.get("level") == "error":
+                salida.append(entrada.get("text", ""))
+            elif params.get("type") == "error":
+                salida.append(" ".join(
+                    str(arg.get("value", "")) for arg in params.get("args", [])))
+        return salida
 
     def js(self, expression):
         res = self.send("Runtime.evaluate", {
