@@ -1,0 +1,21 @@
+# Paquetes extra del contenedor que construye Railway (tarea 7.1).
+#
+# `postgresql_17` está solo por el binario `pg_dump`, que necesita el cron de backup
+# (`manage.py backup_database`). La base de Supabase corre PostgreSQL 17.6 y pg_dump
+# se niega a dumpear un servidor MÁS NUEVO que él, así que la versión no puede quedar
+# suelta: con el paquete `postgresql` a secas, el día que nixpkgs mueva el default el
+# backup empieza a fallar sin que nadie haya tocado nada.
+#
+# El "..." mantiene los paquetes que nixpacks detecta solo (Python y compañía): sin
+# él, esta lista los REEMPLAZA y el build se queda sin intérprete.
+#
+# Este archivo aplica a los cuatro servicios que comparten el repo (web + los tres
+# crons). Solo el de backup usa pg_dump; los demás cargan con unos MB de más en la
+# imagen, que es más barato que mantener una imagen aparte.
+#
+# Si algún día el build falla con "undefined variable 'postgresql_17'", es que el
+# nixpkgs que pinnea nixpacks es viejo: ahí hay que fijar `nixpkgsArchive` a un commit
+# que sí lo tenga (ver BACKUP.md).
+
+[phases.setup]
+nixPkgs = ["...", "postgresql_17"]

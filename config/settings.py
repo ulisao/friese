@@ -138,6 +138,9 @@ LOCAL_APPS = [
     'users',
     'catalog',
     'shipments',
+    # Infraestructura, no dominio: no tiene modelos ni endpoints. Hoy vive acá el
+    # backup de la base (tarea 7.1, `manage.py backup_database`).
+    'ops',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -422,6 +425,57 @@ R2_ENDPOINT_URL = env(
 R2_PUBLIC_BASE_URL = env_required_in_production(
     "R2_PUBLIC_BASE_URL", f"{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}"
 )
+
+
+# --- Backup de la base de datos (tarea 7.1) ---------------------------------
+#
+# El plan de Supabase del proyecto es el FREE, que NO incluye backups gestionados ni
+# point-in-time-recovery: el dump que hace `manage.py backup_database` es la ÚNICA
+# copia que existe de la base. El procedimiento de restauración está en BACKUP.md.
+#
+# Ninguna de estas variables entra en el chequeo de obligatorias del final del archivo,
+# a propósito: si falta una, tiene que fallar el backup (que avisa por email y deja la
+# ejecución del cron en rojo), no el arranque de la API. Un backup mal configurado no
+# es motivo para tirar abajo el despacho de remitos.
+
+# Conexión que usa pg_dump. Si está vacía se deriva del DATABASE_URL de la app,
+# cambiando el puerto del pooler de Supabase de 6543 (modo transacción, que no sirve
+# para pg_dump) a 5432 (modo sesión). Ver `ops/backup.build_backup_dsn`.
+BACKUP_DATABASE_URL = env("BACKUP_DATABASE_URL")
+
+# Binario de pg_dump. Tiene que ser de una versión >= la del servidor (Supabase corre
+# PostgreSQL 17): un pg_dump viejo se niega a dumpear una base más nueva. En Railway
+# lo instala `nixpacks.toml`; en el PATH del sistema alcanza con el nombre.
+PG_DUMP_PATH = env("PG_DUMP_PATH", "pg_dump")
+BACKUP_CONNECT_TIMEOUT_SECONDS = int(env("BACKUP_CONNECT_TIMEOUT_SECONDS", "30"))
+
+# Bucket de backups: SEPARADO del de las fotos de evidencia y con su propio token de
+# R2 (scopeado solo a él). Así, si se filtra la credencial de la app —que sube fotos
+# desde un endpoint público, sin sesión— con ella no se pueden borrar los backups.
+# Las claves caen a las de la app solo para poder probar el comando en desarrollo sin
+# configurar un segundo token; en producción se setean las propias.
+R2_BACKUP_BUCKET_NAME = env("R2_BACKUP_BUCKET_NAME", "friese-backups")
+R2_BACKUP_ACCESS_KEY = env("R2_BACKUP_ACCESS_KEY") or R2_ACCESS_KEY
+R2_BACKUP_SECRET_KEY = env("R2_BACKUP_SECRET_KEY") or R2_SECRET_KEY
+R2_BACKUP_PREFIX = env("R2_BACKUP_PREFIX", "db")
+
+# Retención. 30 días cubre el caso real que motiva un backup lógico: un borrado por
+# error que nadie nota el mismo día. MIN_KEEP es un piso duro — la poda nunca deja
+# menos de 7 copias, aunque estén todas vencidas, para que un cron caído mucho tiempo
+# no termine vaciando el bucket.
+BACKUP_RETENTION_DAYS = int(env("BACKUP_RETENTION_DAYS", "30"))
+BACKUP_MIN_KEEP = int(env("BACKUP_MIN_KEEP", "7"))
+
+# Antigüedad máxima aceptable del último backup. El criterio de la tarea es "menos de
+# 24hs en todo momento" y el cron corre cada 12hs, así que 26 deja margen para que una
+# corrida se atrase sin dar un falso positivo, y sigue avisando MUCHO antes de las 24
+# reales (a las 26h ya se saltearon dos corridas seguidas).
+BACKUP_MAX_AGE_HOURS = int(env("BACKUP_MAX_AGE_HOURS", "26"))
+
+# Casillas que reciben el aviso si el backup falla o si el último quedó vencido
+# (separadas por coma). Sin esto, un cron que se rompe pasa inadvertido justo hasta el
+# día que hay que restaurar.
+BACKUP_ALERT_EMAIL = env("BACKUP_ALERT_EMAIL")
 
 
 # CORS — permite al frontend (operador/receptor) consumir la API.
