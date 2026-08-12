@@ -320,6 +320,20 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
+# Cookie del refresh token (tarea 6.7). El refresh dejó de viajar en el cuerpo de
+# la respuesta: vive en una cookie httpOnly, fuera del alcance de JavaScript.
+REFRESH_COOKIE_NAME = env("REFRESH_COOKIE_NAME", "friese_refresh")
+# El spec de la tarea proponía `Path=/api/auth/refresh/` para que el navegador la
+# mande a un solo endpoint. Se usa `/api/auth/` porque el LOGOUT también necesita
+# leerla para poder blacklistear el token, y con el path más angosto no la
+# recibiría. Bajo `/api/auth/` solo viven login, refresh, logout y el alta por QR:
+# la cookie sigue sin viajar en ninguna request de datos de la app.
+REFRESH_COOKIE_PATH = env("REFRESH_COOKIE_PATH", "/api/auth/")
+
+# El navegador solo manda la cookie si el frontend pide las credenciales
+# (`withCredentials`) Y el backend declara que las acepta para ese origen.
+CORS_ALLOW_CREDENTIALS = True
+
 
 # Base del frontend público (receptor): con esto se arma el link del remito que
 # se le envía al receptor al despachar. La pantalla del receptor (tarea 3.4) vive

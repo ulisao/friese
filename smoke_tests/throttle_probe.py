@@ -13,7 +13,7 @@ import time
 
 import requests
 
-BACKEND = "https://friese-production.up.railway.app"
+BACKEND = "https://api.friese.com.ar"
 PUBLICO = f"{BACKEND}/api/public/shipment/00000000-0000-0000-0000-000000000000/"
 
 print("Esperando 65s a que se vacíe la ventana del minuto anterior…")

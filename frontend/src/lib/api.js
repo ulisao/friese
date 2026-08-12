@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-import { readStoredRefreshToken, useAuthStore } from '@/store/auth'
+import { useAuthStore } from '@/store/auth'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api'
 
@@ -20,8 +20,22 @@ const plainClient = axios.create({ baseURL: API_BASE_URL })
  */
 export const publicApi = axios.create({ baseURL: API_BASE_URL })
 
+/*
+ * Login: la respuesta trae SOLO el access token. El refresh vuelve en una cookie
+ * httpOnly que pone el backend (tarea 6.7), así que hay que pedir explícitamente
+ * que la request lleve/acepte credenciales: sin `withCredentials` el navegador
+ * descarta el Set-Cookie cuando la API está en otro origen.
+ */
 export function login({ username, password }) {
-  return plainClient.post('/auth/login/', { username, password })
+  return plainClient.post('/auth/login/', { username, password }, { withCredentials: true })
+}
+
+/*
+ * Logout: el backend blacklistea el refresh de la cookie y la borra. Se llama
+ * siempre con credenciales, porque la cookie ES el dato que necesita.
+ */
+export function logout() {
+  return plainClient.post('/auth/logout/', null, { withCredentials: true })
 }
 
 // Alta inicial del operador con el token del QR (sección 4). Va por el cliente
@@ -42,19 +56,18 @@ api.interceptors.request.use((config) => {
 // Si varias requests fallan con 401 a la vez, comparten un único refresh en vuelo.
 let refreshInFlight = null
 
+/*
+ * El refresh no manda NADA en el cuerpo: el token va en la cookie httpOnly y lo
+ * adjunta el navegador. Por eso tampoco hay que preocuparse por qué pestaña tiene
+ * el token más nuevo: la cookie es una sola para todo el navegador, así que dos
+ * pestañas no pueden quedar desincronizadas como pasaba con localStorage.
+ */
 function refreshAccessToken() {
-  // localStorage manda sobre el store: si hay otra pestaña abierta, ella pudo
-  // haber rotado el refresh y el de esta pestaña ya estaría blacklisteado.
-  const refreshToken = readStoredRefreshToken() ?? useAuthStore.getState().refreshToken
-  if (!refreshToken) {
-    return Promise.reject(new Error('No hay refresh token disponible.'))
-  }
-
   if (!refreshInFlight) {
     refreshInFlight = plainClient
-      .post('/auth/refresh/', { refresh: refreshToken })
+      .post('/auth/refresh/', null, { withCredentials: true })
       .then(({ data }) => {
-        useAuthStore.getState().setTokens({ access: data.access, refresh: data.refresh })
+        useAuthStore.getState().setAccessToken(data.access)
         return data.access
       })
       .finally(() => {
@@ -66,9 +79,11 @@ function refreshAccessToken() {
 }
 
 /*
- * Al abrir la app: si quedó un refresh token guardado, se canjea por un access
- * token nuevo para revivir la sesión sin pasar por el login. Si el refresh ya
- * expiró o está blacklisteado, se limpia y la app arranca en el login.
+ * Al abrir la app: se intenta canjear la cookie por un access token nuevo, para
+ * revivir la sesión sin pasar por el login. Si la cookie no está, expiró o el
+ * token quedó blacklisteado, el backend responde 401 y la app arranca en el
+ * login. (Se intenta solo si hubo una sesión antes en este dispositivo: la
+ * cookie es httpOnly, así que desde JS no hay forma de saber si existe.)
  */
 export async function restoreSession() {
   if (useAuthStore.getState().status !== 'bootstrapping') return

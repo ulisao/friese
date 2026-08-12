@@ -32,7 +32,8 @@ export function LoginPage() {
 
     try {
       const { data } = await login({ username, password })
-      setSession({ access: data.access, refresh: data.refresh, username })
+      // El refresh no viene en la respuesta: quedó en la cookie httpOnly (6.7).
+      setSession({ access: data.access, username })
       navigate(location.state?.from ?? '/', { replace: true })
     } catch (requestError) {
       setError(

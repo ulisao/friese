@@ -44,7 +44,7 @@ from shipments.models import Evidence, Shipment, ShipmentItem  # noqa: E402
 from users.models import OperatorInvite, User  # noqa: E402
 
 # --- Producción -------------------------------------------------------------
-BACKEND = "https://friese-production.up.railway.app"
+BACKEND = "https://api.friese.com.ar"
 FRONTEND = "https://app.friese.com.ar"
 API = f"{BACKEND}/api"
 
