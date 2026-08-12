@@ -31,7 +31,7 @@ from django.db import connection  # noqa: E402
 
 from e2e import check, summary  # noqa: E402
 
-URL = "https://friese-production.up.railway.app/api/public/shipment/00000000-0000-0000-0000-000000000000/"
+URL = "https://api.friese.com.ar/api/public/shipment/00000000-0000-0000-0000-000000000000/"
 TOTAL = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 CONCURRENCIA = int(sys.argv[2]) if len(sys.argv) > 2 else 8
 
