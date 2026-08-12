@@ -237,21 +237,21 @@ Lo que hay que configurar una sola vez para que el backup empiece a correr.
    - **Specify bucket** → solo `friese-backup`
 3. Guardar el Access Key ID y el Secret Access Key.
 
-> **OJO — esto todavía NO es cierto y hay que arreglarlo** (detectado el 2026-08-12 al
-> hacer la 7.2). La intención del diseño es que el token que usa la app para subir
-> fotos (`R2_ACCESS_KEY`) esté scopeado a `friese-evidence` y no pueda tocar los
-> buckets de backup: ese token vive en un backend con endpoints públicos sin sesión, y
+> El token que usa la app para subir fotos (`R2_ACCESS_KEY`) está scopeado a
+> `friese-evidence` y **no puede** tocar este bucket ni el de las fotos de respaldo. Es
+> a propósito: ese token vive en un backend que expone endpoints públicos sin sesión, y
 > si se filtra no tiene que alcanzar para borrar las copias.
 >
-> Medido contra la cuenta real, ese token tiene **Object Read & Write sobre los TRES
-> buckets**: puede listar, escribir y **borrar** en `friese-backup` y en
-> `friese-evidence-backup`. O sea que hoy una sola credencial filtrada alcanza para
-> destruir los datos y sus dos copias.
+> **Verificado contra la cuenta real el 2026-08-12**, y no siempre fue así: hasta ese
+> día el token de la app aplicaba a TODOS los buckets de la cuenta y podía borrar los
+> objetos de los tres. Se arregló editando el token —R2 → Manage API tokens → Edit →
+> *Specify bucket* → solo `friese-evidence`—, **sin rotar credenciales**: en R2 el
+> Access Key ID sale del ID del token y el secret de su valor, así que cambiar el
+> alcance no los cambia y no hubo que tocar Railway ni `.env`. Lo que SÍ los cambia es
+> **Roll**, que en este caso no hay que usar.
 >
-> **Cómo arreglarlo:** R2 → Manage API Tokens → crear un token nuevo con **Object Read
-> & Write** y **Specify bucket → solo `friese-evidence`**, reemplazar `R2_ACCESS_KEY` /
-> `R2_SECRET_KEY` en Railway y en `.env`, y borrar el token viejo. Los tokens de los dos
-> backups sí están bien scopeados (verificado: cada uno solo ve su propio bucket).
+> Los tres tokens (app, backup de la base y backup de las fotos) están hoy scopeados a
+> un solo bucket cada uno: cada uno da `AccessDenied` sobre los otros dos.
 
 ### 4.2 — Variables en Railway
 
@@ -520,6 +520,6 @@ python smoke_tests/evidence_backup.py
 - **Un borrado con la credencial del respaldo.** El token del respaldo puede borrar su
   propio bucket. La protección es que ese token solo vive en los dos crons, no en la
   API pública.
-- **Un borrado con la credencial de la APP.** Hoy `R2_ACCESS_KEY` puede borrar los tres
-  buckets, así que esa protección todavía no existe de verdad. Ver el aviso de la
-  [sección 4.1](#41--bucket-y-token-en-cloudflare): hay que re-scopear ese token.
+- **Un borrado con la credencial de la APP.** `R2_ACCESS_KEY` puede borrar las fotos del
+  bucket principal —lo necesita para funcionar—, pero desde el 2026-08-12 ya no llega a
+  ninguno de los dos buckets de respaldo. Ver la [sección 4.1](#41--bucket-y-token-en-cloudflare).
