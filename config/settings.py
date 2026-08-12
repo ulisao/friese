@@ -478,6 +478,40 @@ BACKUP_MAX_AGE_HOURS = int(env("BACKUP_MAX_AGE_HOURS", "26"))
 BACKUP_ALERT_EMAIL = env("BACKUP_ALERT_EMAIL")
 
 
+# --- Respaldo de las fotos de evidencia (tarea 7.2) --------------------------
+#
+# El backup de la base guarda las URLs de las fotos, no los bytes. Las fotos son el
+# producto, así que tienen su propia copia en un segundo bucket, que hace
+# `manage.py backup_evidence`. R2 no implementa versionado de objetos (verificado:
+# `list_object_versions` responde 501) ni replicación entre buckets, así que la copia
+# es un job periódico. Detalle en `ops/evidence_backup.py` y en BACKUP.md sección 7.
+#
+# Igual que las del backup de la base, ninguna es obligatoria para arrancar: si falta
+# una, falla el respaldo —que avisa por email—, no el despacho de remitos.
+
+# Bucket destino, con su propio token scopeado solo a él. El endpoint es configurable
+# aparte para poder mudar la copia a otra cuenta de Cloudflare o a otro proveedor
+# S3-compatible sin tocar código. Las claves caen a las de la app solo para poder
+# probar en desarrollo sin configurar un segundo token.
+R2_EVIDENCE_BACKUP_BUCKET_NAME = env(
+    "R2_EVIDENCE_BACKUP_BUCKET_NAME", "friese-evidence-backup"
+)
+R2_EVIDENCE_BACKUP_ACCESS_KEY = env("R2_EVIDENCE_BACKUP_ACCESS_KEY") or R2_ACCESS_KEY
+R2_EVIDENCE_BACKUP_SECRET_KEY = env("R2_EVIDENCE_BACKUP_SECRET_KEY") or R2_SECRET_KEY
+R2_EVIDENCE_BACKUP_ENDPOINT_URL = env(
+    "R2_EVIDENCE_BACKUP_ENDPOINT_URL", R2_ENDPOINT_URL
+)
+
+# Carpeta dentro del bucket destino. Vacío = la copia conserva la MISMA key que el
+# original, que es lo que hace que restaurar sea copiar de vuelta sin traducir nada.
+R2_EVIDENCE_BACKUP_PREFIX = env("R2_EVIDENCE_BACKUP_PREFIX", "")
+
+# A partir de cuántas horas una foto sin copiar deja de ser "recién subida" y pasa a
+# ser un problema. La copia corre cada 6hs: 26 tolera varias corridas salteadas sin dar
+# falsos positivos, y es el mismo criterio que BACKUP_MAX_AGE_HOURS.
+EVIDENCE_BACKUP_MAX_AGE_HOURS = int(env("EVIDENCE_BACKUP_MAX_AGE_HOURS", "26"))
+
+
 # CORS — permite al frontend (operador/receptor) consumir la API.
 # En dev se listan los orígenes locales; en prod es obligatoria (los dominios de
 # Vercel), porque con el default el frontend real no podría llamar a la API.
