@@ -28,10 +28,12 @@ def pegar(_):
 
 
 TOTAL = int(sys.argv[1]) if len(sys.argv) > 1 else 120
-with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+CONCURRENCIA = int(sys.argv[2]) if len(sys.argv) > 2 else 16
+with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCIA) as pool:
     codigos = list(pool.map(pegar, range(TOTAL)))
 
-print(f"{TOTAL} requests en paralelo:", dict(collections.Counter(codigos)))
+print(f"{TOTAL} requests con concurrencia {CONCURRENCIA}:",
+      dict(collections.Counter(codigos)))
 print("primera 429 en la posición:",
       next((i + 1 for i, c in enumerate(codigos) if c == 429), "nunca"))
 

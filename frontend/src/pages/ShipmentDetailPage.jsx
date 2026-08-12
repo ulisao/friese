@@ -191,13 +191,21 @@ export function ShipmentDetailPage() {
 
   const isDraft = shipment.status === 'draft'
   const evidence = shipment.evidence ?? []
+  // Las fotos del despacho (las que sacó el operador) y las de la recepción (las
+  // que sacó el receptor al reclamar) NO van juntas: son de momentos distintos y
+  // de personas distintas, y mezcladas no se entiende qué se está mirando.
+  const dispatchPhotos = evidence.filter((photo) => photo.type !== 'reception')
+  const receptionPhotos = evidence.filter((photo) => photo.type === 'reception')
   const items = shipment.items ?? []
   // Nombre del producto de cada foto: la evidencia trae el id del ítem, no el nombre.
   const itemNames = new Map(items.map((item) => [item.id, item.product_name]))
   const photoLabel = (itemId) =>
     itemId == null ? 'Remito completo' : (itemNames.get(itemId) ?? 'Producto eliminado')
+  // Solo las del despacho: las de la recepción son del receptor y se cuentan en su
+  // propia sección (si no, un remito en disputa diría "3 fotos de este producto"
+  // sumando las del reclamo).
   const countFor = (itemId) =>
-    evidence.filter((photo) => photo.shipment_item === itemId).length +
+    dispatchPhotos.filter((photo) => photo.shipment_item === itemId).length +
     pending.filter((photo) => photo.itemId === itemId).length
   // Mientras haya fotos sin confirmar (subiendo o falladas) no se despacha: el
   // despacho es irreversible y tiene que salir con la evidencia ya guardada.
@@ -225,6 +233,51 @@ export function ShipmentDetailPage() {
           <p className="rounded-md border p-3 text-sm text-muted-foreground" role="status">
             Este remito ya fue despachado: es inmutable y se muestra en modo lectura.
           </p>
+        )}
+
+        {/* Qué contestó el receptor. Es lo primero que quiere saber el operador
+            cuando entra a un remito ya despachado, así que va arriba de todo. */}
+        {shipment.status === 'disputed' && (
+          <div
+            className="rounded-md border border-red-500 p-3"
+            role="status"
+            data-testid="dispute-panel"
+          >
+            <p className="text-sm font-medium text-red-500">El receptor reportó un problema</p>
+            {shipment.dispute_reason ? (
+              <p className="pt-1 text-sm" data-testid="dispute-reason">
+                «{shipment.dispute_reason}»
+              </p>
+            ) : (
+              <p className="pt-1 text-sm text-muted-foreground" data-testid="dispute-reason">
+                No dejó un motivo escrito.
+              </p>
+            )}
+            {receptionPhotos.length > 0 && (
+              <p className="pt-1 text-sm text-muted-foreground">
+                Sacó {receptionPhotos.length} foto{receptionPhotos.length === 1 ? '' : 's'} de la
+                carga recibida, más abajo.
+              </p>
+            )}
+          </div>
+        )}
+
+        {shipment.status === 'accepted' && (
+          <div className="rounded-md border p-3" role="status" data-testid="accepted-panel">
+            {shipment.auto_closed ? (
+              <>
+                <p className="text-sm font-medium">Cerrado automáticamente</p>
+                <p className="pt-1 text-sm text-muted-foreground">
+                  El receptor no respondió dentro de las 48hs, así que el remito quedó registrado
+                  como aceptado por silencio.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-green-500">
+                El receptor confirmó que recibió todo conforme.
+              </p>
+            )}
+          </div>
         )}
 
         <Card className="gap-4 rounded-lg p-4">
@@ -293,11 +346,11 @@ export function ShipmentDetailPage() {
 
         <Card className="gap-4 rounded-lg p-4">
           <CardHeader className="p-0">
-            <CardTitle className="text-base">Fotos de evidencia</CardTitle>
+            <CardTitle className="text-base">Fotos del despacho</CardTitle>
           </CardHeader>
 
           <CardContent className="flex flex-col gap-4 p-0">
-            {evidence.length === 0 && pending.length === 0 && (
+            {dispatchPhotos.length === 0 && pending.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 {isDraft
                   ? 'Todavía no sacaste fotos de este remito.'
@@ -305,9 +358,9 @@ export function ShipmentDetailPage() {
               </p>
             )}
 
-            {(evidence.length > 0 || pending.length > 0) && (
+            {(dispatchPhotos.length > 0 || pending.length > 0) && (
               <ul className="grid grid-cols-2 gap-3" data-testid="evidence-list">
-                {evidence.map((photo) => (
+                {dispatchPhotos.map((photo) => (
                   <li
                     key={`evidence-${photo.id}`}
                     data-evidence-id={photo.id}
@@ -378,6 +431,36 @@ export function ShipmentDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Las fotos que sacó el RECEPTOR al reclamar. Van en su propia card, con
+            su propio título: son la contraparte de las de arriba. */}
+        {receptionPhotos.length > 0 && (
+          <Card className="gap-4 rounded-lg p-4">
+            <CardHeader className="p-0">
+              <CardTitle className="text-base">Fotos de la carga recibida</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 p-0">
+              <p className="text-sm text-muted-foreground">
+                Las sacó el receptor al revisar la entrega.
+              </p>
+              <ul className="grid grid-cols-2 gap-3" data-testid="reception-evidence-list">
+                {receptionPhotos.map((photo) => (
+                  <li key={`reception-${photo.id}`} data-evidence-id={photo.id}>
+                    <img
+                      src={photo.file_url}
+                      alt={`Foto de la recepción del remito #${shipment.id}`}
+                      className="aspect-square w-full rounded-md border object-cover"
+                    />
+                    <p className="truncate pt-1 text-xs font-medium">
+                      {photoLabel(photo.shipment_item)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{formatDate(photo.uploaded_at)}</p>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {isDraft && (
           <>

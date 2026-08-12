@@ -26,3 +26,7 @@ django-crontab==0.7.1
 # Almacenamiento (Cloudflare R2 vía S3) y emails (Resend)
 boto3==1.43.67
 resend==2.35.0
+
+# QR de la invitación de operador (users/invites.py). Se usa el factory SVG, que
+# es Python puro: NO requiere Pillow.
+qrcode==8.2

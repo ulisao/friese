@@ -356,6 +356,14 @@ RESEND_FROM_EMAIL = env_required_in_production(
 REMINDER_AFTER_HOURS = int(env("REMINDER_AFTER_HOURS", "24"))
 
 
+# Tamaño máximo de una foto de evidencia, en MB. Lo valida el serializer de la
+# subida (shipments/serializers.py), y aplica igual al operador autenticado que al
+# receptor por el link público — que es el que más importa, porque ese endpoint no
+# tiene sesión. Una foto de celular de 12 Mpx ronda los 3-5 MB, así que 15 entra
+# cómodo sin dejar la puerta abierta a subir cualquier cosa.
+MAX_EVIDENCE_UPLOAD_MB = int(env("MAX_EVIDENCE_UPLOAD_MB", "15"))
+
+
 # Tareas periódicas (django-crontab) — docs/desarrollo.md sección 6.
 # Se registran en el cron del sistema con `python manage.py crontab add` (y se
 # quitan con `crontab remove`) al deployar — requiere un host Linux con cron.

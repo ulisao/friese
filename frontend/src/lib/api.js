@@ -24,6 +24,12 @@ export function login({ username, password }) {
   return plainClient.post('/auth/login/', { username, password })
 }
 
+// Alta inicial del operador con el token del QR (sección 4). Va por el cliente
+// pelado: todavía no hay sesión que refrescar.
+export function registerOperator({ token, username, password }) {
+  return plainClient.post('/auth/register-operator/', { token, username, password })
+}
+
 // Cada request sale con el access token que haya en el store en ese momento.
 api.interceptors.request.use((config) => {
   const { accessToken } = useAuthStore.getState()

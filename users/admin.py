@@ -1,5 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.utils import timezone
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from rest_framework_simplejwt.token_blacklist.admin import (
     BlacklistedTokenAdmin as SimpleJWTBlacklistedTokenAdmin,
 )
@@ -11,6 +14,7 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 from companies.admin_mixins import CompanyScopedAdminMixin
 
 from .groups import ensure_company_admin_group
+from .invites import build_invite_qr_svg, build_invite_url
 from .models import OperatorInvite, User
 
 
@@ -102,8 +106,38 @@ class OperatorInviteAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
     list_filter = ("is_used", "company")
     search_fields = ("token",)
     # token: editable=False + default uuid4 → aparece (readonly) recién al guardar.
-    readonly_fields = ("token", "created_at")
+    readonly_fields = ("token", "created_at", "link_de_alta", "qr")
     autocomplete_fields = ("company",)
+
+    @admin.display(description="Link de alta")
+    def link_de_alta(self, obj):
+        """La URL que el operador abre para darse de alta (la que codifica el QR)."""
+        if not obj.pk:
+            return "Se genera al guardar la invitación."
+        url = build_invite_url(obj.token)
+        return format_html('<a href="{}" target="_blank" rel="noopener">{}</a>', url, url)
+
+    @admin.display(description="QR para el operador")
+    def qr(self, obj):
+        """El QR de esa URL, para que el operador lo escanee con la cámara.
+
+        Se muestra igual si la invitación está usada o vencida, pero con el aviso
+        de que ya no sirve: es más claro que esconderlo sin explicación.
+        """
+        if not obj.pk:
+            return "Se genera al guardar la invitación."
+
+        aviso = ""
+        if obj.is_used:
+            aviso = "Esta invitación YA FUE USADA: el QR no sirve más."
+        elif obj.expires_at <= timezone.now():
+            aviso = "Esta invitación VENCIÓ: generá una nueva."
+
+        return format_html(
+            '<div style="max-width:220px">{}<p style="margin-top:8px">{}</p></div>',
+            mark_safe(build_invite_qr_svg(obj.token)),  # noqa: S308 - SVG generado acá
+            aviso or "Escanealo con la cámara del celular del operador.",
+        )
 
 
 # Los admins de los tokens JWT los registra simplejwt (app token_blacklist). Se

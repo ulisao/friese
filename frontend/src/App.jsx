@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { LoginPage } from '@/pages/LoginPage'
 import { NewShipmentPage } from '@/pages/NewShipmentPage'
+import { RegisterOperatorPage } from '@/pages/RegisterOperatorPage'
 import { ShipmentDetailPage } from '@/pages/ShipmentDetailPage'
 import { ShipmentsPage } from '@/pages/ShipmentsPage'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
@@ -27,6 +28,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Alta del operador: es la URL que codifica el QR que genera el admin de
+          la empresa (users/invites.py). Pública: el operador todavía no existe. */}
+      <Route path="/alta-operador/:token" element={<RegisterOperatorPage />} />
 
       {/* Pantalla del receptor: pública, sin login. Es la ruta que arma
           emails.build_public_link() con el public_token del remito. */}

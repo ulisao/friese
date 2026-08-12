@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from .models import Evidence, Shipment, ShipmentItem
@@ -223,6 +224,18 @@ class BaseEvidenceUploadSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "La evidencia debe ser una imagen. "
                 f"Se recibió un archivo de tipo '{upload.content_type}'."
+            )
+
+        # Límite de tamaño. Sin esto, el endpoint del RECEPTOR —que es público y
+        # sin sesión— acepta un archivo de cualquier tamaño, y cada uno se sube
+        # entero a R2. El default (15 MB) entra cómodo para una foto de celular
+        # (una de 12 Mpx ronda los 3-5 MB) y es configurable por env.
+        limite = settings.MAX_EVIDENCE_UPLOAD_MB * 1024 * 1024
+        if upload.size > limite:
+            raise serializers.ValidationError(
+                f"La foto no puede pesar más de {settings.MAX_EVIDENCE_UPLOAD_MB} MB "
+                f"(esta pesa {upload.size / 1024 / 1024:.1f} MB). "
+                "Sacala de nuevo con menos resolución."
             )
         return upload
 
