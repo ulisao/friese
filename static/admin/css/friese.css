@@ -1,0 +1,305 @@
+/*
+ * Friese — tema del panel de administración (tarea 7.3).
+ *
+ * Reskin del Django Admin nativo: NO es un panel nuevo. Se carga DESPUÉS de
+ * base.css, dark_mode.css y login.css (va en el bloque `extrahead` de
+ * templates/admin/base_site.html), así que alcanza con redefinir las variables
+ * del admin con la paleta de docs/diseno.md y ajustar unos pocos componentes.
+ *
+ * El admin es SIEMPRE oscuro, igual que las dos apps de React: el selector de
+ * tema del header queda oculto. Por eso las variables se redefinen en los tres
+ * valores posibles de data-theme (auto/light/dark) y en :root — misma
+ * especificidad que base.css y dark_mode.css, pero este archivo va después.
+ */
+
+html[data-theme="auto"],
+html[data-theme="light"],
+html[data-theme="dark"],
+:root {
+    /* --- Paleta base (docs/diseno.md sección 2) --- */
+    --friese-bg: #1a1a22;        /* fondo base */
+    --friese-surface: #24242e;   /* cards / superficies elevadas */
+    --friese-surface-2: #2e2e3a; /* un escalón más arriba: filas seleccionadas, chips */
+    --friese-indigo: #4f46e5;    /* indigo funcional: botones, estados activos */
+    --friese-indigo-hover: #4338ca;
+    /* Indigo aclarado SOLO para texto sobre fondo oscuro: el #4F46E5 del spec da
+       2.75:1 sobre el fondo base, muy por debajo del 4.5 de WCAG AA. Como relleno
+       de botón el #4F46E5 se usa tal cual (blanco encima = 6.29:1). Es el mismo
+       criterio que ya se tomó en el frontend (frontend/src/index.css, tarea 6.5). */
+    --friese-indigo-text: #a5b4fc;
+    --friese-gold: #d6ac31;      /* dorado del logo: solo momentos de marca */
+
+    --primary: var(--friese-indigo);
+    --secondary: var(--friese-indigo);
+    --accent: var(--friese-gold);
+    --primary-fg: #ffffff;
+
+    --body-fg: #f1f1f5;
+    --body-bg: var(--friese-bg);
+    --body-quiet-color: #a1a1ae;
+    --body-medium-color: #c9c9d4;
+    --body-loud-color: #ffffff;
+
+    /* Header: superficie elevada con el dorado reservado a la marca. NO se pinta
+       de indigo (el indigo es interacción, no branding). */
+    --header-bg: var(--friese-surface);
+    --header-color: #a1a1ae;
+    --header-branding-color: var(--friese-gold);
+    --header-link-color: #f1f1f5;
+
+    --breadcrumbs-bg: #1f1f28;
+    --breadcrumbs-fg: #a1a1ae;
+    --breadcrumbs-link-fg: #f1f1f5;
+
+    --link-fg: var(--friese-indigo-text);
+    --link-hover-color: #c7d2fe;
+    --link-selected-fg: var(--friese-indigo-text);
+
+    --hairline-color: #2e2e3a;
+    --border-color: #3a3a48;
+
+    /* Mismo rojo de texto que el frontend: el red-500 del estado "disputed" es
+       demasiado oscuro como TEXTO sobre las cards (4.08). Este da 5.32. */
+    --error-fg: #ff6467;
+
+    --message-success-bg: #14532d;
+    --message-warning-bg: #4a3410;
+    --message-error-bg: #4c1d1d;
+
+    --darkened-bg: var(--friese-surface);
+    --selected-bg: var(--friese-surface-2);
+    --selected-row: #2f2c55; /* tinte indigo, no el amarillo del admin nativo */
+
+    --button-fg: #ffffff;
+    --button-bg: var(--friese-indigo);
+    --button-hover-bg: var(--friese-indigo-hover);
+    --default-button-bg: var(--friese-indigo);
+    --default-button-hover-bg: var(--friese-indigo-hover);
+    --close-button-bg: #3a3a48;
+    --close-button-hover-bg: #4a4a5c;
+    --delete-button-bg: #b91c1c;
+    --delete-button-hover-bg: #991b1b;
+
+    --object-tools-fg: #f1f1f5;
+    --object-tools-bg: #3a3a48;
+    --object-tools-hover-bg: #4a4a5c;
+
+    /* Inter es la única familia del sistema (docs/diseno.md sección 3). Acá se
+       usa la que tenga instalada el equipo: el admin no carga webfonts y traerla
+       de un CDN agregaría una dependencia externa al panel. El fallback es la
+       tipografía de sistema, que es lo que ya usaba el admin. */
+    --font-family-primary:
+        Inter,
+        "Segoe UI",
+        system-ui,
+        Roboto,
+        "Helvetica Neue",
+        Arial,
+        sans-serif,
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji";
+
+    color-scheme: dark;
+}
+
+/* --- Header y marca ------------------------------------------------------ */
+
+#header {
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 40px;
+}
+
+#branding {
+    display: flex;
+    align-items: center;
+}
+
+#site-name {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+/* El logo (el cubo dorado del isotipo) al lado del nombre del panel. */
+.friese-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.friese-brand img {
+    height: 30px;
+    width: auto;
+    display: block;
+}
+
+.friese-brand a,
+.friese-brand a:link,
+.friese-brand a:visited {
+    color: var(--friese-gold);
+    text-decoration: none;
+}
+
+/* El admin es siempre oscuro: el selector de tema no tiene nada que alternar. */
+.theme-toggle {
+    display: none !important;
+}
+
+div.breadcrumbs {
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* --- Superficies: cards planas y prolijas (docs/diseno.md sección 4) ------ */
+
+.module,
+.dashboard #content-main .module,
+#changelist-filter,
+.inline-group {
+    background: var(--friese-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: none;
+}
+
+.module caption,
+.module h2,
+.inline-group h2,
+#changelist-filter h2 {
+    background: var(--friese-surface-2);
+    color: var(--body-fg);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.module caption a,
+.module caption a:link,
+.module caption a:visited {
+    color: var(--body-fg);
+}
+
+/* Encabezado de tabla: un tono más arriba, para despegarlo de las filas. */
+#result_list thead th,
+.module table thead th {
+    background: var(--friese-surface-2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Filas de tabla: sin cebra amarilla, solo un cambio de tono muy suave. */
+#changelist table tbody tr:nth-child(odd),
+.module table tbody tr:nth-child(odd) {
+    background: var(--friese-surface);
+}
+
+#changelist table tbody tr:nth-child(even),
+.module table tbody tr:nth-child(even) {
+    background: #262631;
+}
+
+/* --- Controles: radios del spec (botones/inputs rounded-md) --------------- */
+
+.button,
+input[type=submit],
+input[type=button],
+.submit-row input,
+a.button,
+.object-tools a {
+    border-radius: 6px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    box-shadow: none;
+}
+
+/* El admin pone en MAYÚSCULAS solo el botón principal, así que en una misma barra
+   convivían "GUARDAR" y "Guardar y agregar otro". La jerarquía la marca el color
+   de relleno, no el capslock. `responsive.css` se carga DESPUÉS que esta hoja y
+   repite la regla para el login en pantallas chicas: de ahí el selector más
+   específico del segundo caso. */
+.submit-row input.default,
+.login .submit-row input[type=submit] {
+    text-transform: none;
+}
+
+input[type=text],
+input[type=password],
+input[type=email],
+input[type=url],
+input[type=number],
+input[type=tel],
+textarea,
+select,
+.vTextField {
+    background: var(--friese-bg);
+    color: var(--body-fg);
+    /* El borde es lo único que identifica al campo: necesita 3:1 contra el fondo
+       (WCAG 1.4.11). #70707F da 3.55 sobre el fondo base. */
+    border: 1px solid #70707f;
+    border-radius: 6px;
+}
+
+input[type=text]:focus,
+input[type=password]:focus,
+input[type=email]:focus,
+input[type=url]:focus,
+input[type=number]:focus,
+input[type=tel]:focus,
+textarea:focus,
+select:focus,
+.vTextField:focus {
+    border-color: var(--friese-indigo-text);
+    outline: 2px solid var(--friese-indigo-text);
+    outline-offset: -1px;
+}
+
+/* --- Login --------------------------------------------------------------- */
+
+.login {
+    background: var(--friese-bg);
+}
+
+.login #container {
+    background: var(--friese-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+/* En el login la marca va sola y grande, sin la barra de header del panel. */
+.login #header {
+    background: transparent;
+    border-bottom: none;
+    padding: 24px 16px 8px;
+    height: auto;
+    display: block;
+    text-align: center;
+}
+
+.login #branding {
+    display: block;
+}
+
+.login .friese-brand {
+    display: block;
+}
+
+.login .friese-brand img {
+    height: 96px;
+    margin: 0 auto 4px;
+}
+
+.login .friese-brand .friese-brand-name {
+    display: block;
+    font-size: 1.0625rem;
+    color: var(--body-quiet-color);
+    font-weight: 500;
+}
+
+.login .submit-row input[type=submit] {
+    background: var(--friese-indigo);
+    color: #ffffff;
+}

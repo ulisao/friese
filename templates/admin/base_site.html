@@ -1,0 +1,43 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% comment %}
+  Friese — branding del panel de administración (tarea 7.3).
+
+  Pisa el `admin/base_site.html` de Django: mismo esqueleto, pero con el logo de
+  marca en el header y la hoja de estilos del tema oscuro. El resto del admin
+  (listados, formularios, permisos) sigue siendo el nativo.
+{% endcomment %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Panel Friese') }}{% endblock %}
+
+{% comment %}
+  `extrahead` va después de base.css, dark_mode.css y login.css, así que el tema
+  se aplica sin pelear especificidad. Todas las plantillas del admin que pisan
+  este bloque lo hacen con {{ block.super }}, así que el link nunca se pierde.
+{% endcomment %}
+{% block extrahead %}
+  <link rel="stylesheet" href="{% static "admin/css/friese.css" %}">
+  <link rel="icon" href="{% static "admin/img/friese-mark.png" %}">
+{% endblock %}
+
+{% block branding %}
+  {% comment %}
+    `has_permission` es False en el login y en el logout: ahí la marca va sola y
+    grande (el logo completo, con el nombre). Dentro del panel va el isotipo
+    chico al lado del título, para no comerse el header.
+  {% endcomment %}
+  {% if has_permission %}
+    <div id="site-name" class="friese-brand">
+      <img src="{% static "admin/img/friese-mark.png" %}" alt="">
+      <a href="{% url 'admin:index' %}">{{ site_header|default:_('Panel Friese') }}</a>
+    </div>
+  {% else %}
+    <div id="site-name" class="friese-brand">
+      <img src="{% static "admin/img/friese-logo.png" %}" alt="Friese">
+      <span class="friese-brand-name">{{ site_header|default:_('Panel Friese') }}</span>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

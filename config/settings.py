@@ -128,6 +128,11 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     # Blacklist de refresh tokens: necesaria para BLACKLIST_AFTER_ROTATION y para
     # la revocación manual desde el admin (ver docs/desarrollo.md sección 4).
+    # OJO: tiene que ir con esta ruta EXACTA. Sus modelos se declaran abstractos
+    # salvo que este string literal esté en INSTALLED_APPS (workaround de simplejwt
+    # al ticket 19422 de Django), así que instalarla por una subclase de su
+    # AppConfig los vuelve abstractos y el admin no los puede registrar. Los
+    # nombres en castellano de esa sección se ponen desde `users/apps.py` (7.3).
     'rest_framework_simplejwt.token_blacklist',
     # Tareas periódicas sobre el cron del sistema (ver CRONJOBS más abajo).
     'django_crontab',
@@ -165,7 +170,10 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # `templates/` en la raíz del repo. Django busca acá ANTES que en los
+        # templates de las apps, así que `templates/admin/base_site.html` pisa al
+        # del admin nativo sin tocar el paquete de Django (tarea 7.3).
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -238,6 +246,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# `static/` en la raíz del repo: el reskin del admin (tarea 7.3) vive ahí
+# (`static/admin/css/friese.css` y el logo). No es la carpeta de una app porque no
+# pertenece a ninguna: es el tema del panel entero.
+STATICFILES_DIRS = [BASE_DIR / 'static']
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
