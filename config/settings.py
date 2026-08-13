@@ -228,6 +228,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Cuánto vive el link de recuperación de contraseña (tarea 7.4). Django lo espera
+# en segundos y trae 3 días por default: es mucho para un link que da acceso a la
+# cuenta. Con 24hs, el que lo pide un viernes a la noche todavía lo puede usar el
+# sábado. Además el token se invalida solo apenas se cambia la contraseña, así que
+# sirve UNA vez aunque no haya vencido (ver users/password_reset.py).
+PASSWORD_RESET_TIMEOUT = int(env("PASSWORD_RESET_TIMEOUT_HOURS", "24")) * 3600
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -313,6 +320,9 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "public_burst": env("PUBLIC_THROTTLE_BURST", "30/min"),
         "public_sustained": env("PUBLIC_THROTTLE_SUSTAINED", "300/hour"),
+        # Recuperación de contraseña (tarea 7.4): cupo por IP compartido por el
+        # pedido del link y la confirmación. Ver users/throttling.py.
+        "password_reset": env("PASSWORD_RESET_THROTTLE", "20/hour"),
     },
     # De qué IP se cuenta el cupo. En producción el backend está detrás del proxy
     # de la plataforma (Railway/Render), así que REMOTE_ADDR es el proxy y hay que

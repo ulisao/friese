@@ -17,6 +17,7 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 # Branding del panel (tarea 7.3). Reemplaza el "Django administration" por defecto
 # en el header, en el <title> de la pestaña y en el encabezado del índice. El
@@ -29,6 +30,21 @@ admin.site.index_title = "Administración"
 admin.site.site_url = settings.FRONTEND_PUBLIC_URL
 
 urlpatterns = [
+    # "¿Perdiste tu contraseña?" en el login del panel (tarea 7.4). El template de
+    # login del admin dibuja ese link solo si existe una URL llamada
+    # `admin_password_reset`; acá esa URL manda a la MISMA pantalla de
+    # recuperación que usa el operador, así hay un solo flujo para los dos.
+    # Tiene que ir ANTES de 'admin/': el admin tiene un catch-all al final de sus
+    # URLs que devolvería 404 antes de llegar hasta acá.
+    path(
+        'admin/password_reset/',
+        RedirectView.as_view(
+            url=f"{settings.FRONTEND_PUBLIC_URL.rstrip('/')}/recuperar-contrasena",
+            permanent=False,
+            query_string=False,
+        ),
+        name='admin_password_reset',
+    ),
     path('admin/', admin.site.urls),
     path('api/auth/', include('users.urls')),
     path('api/', include('catalog.urls')),

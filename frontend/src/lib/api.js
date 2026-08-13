@@ -39,9 +39,23 @@ export function logout() {
 }
 
 // Alta inicial del operador con el token del QR (sección 4). Va por el cliente
-// pelado: todavía no hay sesión que refrescar.
-export function registerOperator({ token, username, password }) {
-  return plainClient.post('/auth/register-operator/', { token, username, password })
+// pelado: todavía no hay sesión que refrescar. El email es opcional y sirve para
+// que después pueda recuperar la contraseña solo (tarea 7.4).
+export function registerOperator({ token, username, password, email }) {
+  return plainClient.post('/auth/register-operator/', { token, username, password, email })
+}
+
+/*
+ * Recuperación de contraseña (tarea 7.4). Los dos pasos van por el cliente pelado:
+ * el que se olvidó la contraseña no tiene sesión, así que no hay nada que refrescar
+ * ni ningún Authorization que mandar.
+ */
+export function requestPasswordReset({ identifier }) {
+  return plainClient.post('/auth/password-reset/', { identifier })
+}
+
+export function confirmPasswordReset({ uid, token, password }) {
+  return plainClient.post('/auth/password-reset/confirm/', { uid, token, password })
 }
 
 // Cada request sale con el access token que haya en el store en ese momento.

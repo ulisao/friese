@@ -379,7 +379,11 @@ def _deliver(payload, company_id):
         "Email enviado por Resend a %s (id=%s).", payload.get("to"), sent.get("id")
     )
     # emails_sent del mes (sección 6). Se cuenta solo lo que Resend aceptó.
-    increment_usage(company_id, "emails_sent")
+    # `company_id` puede venir en None desde la recuperación de contraseña (7.4):
+    # el superadmin de Friese no pertenece a ninguna empresa y no hay UsageLog que
+    # tocar. El resto de los emails siempre tiene empresa.
+    if company_id:
+        increment_usage(company_id, "emails_sent")
     return True
 
 

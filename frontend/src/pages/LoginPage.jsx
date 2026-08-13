@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -104,6 +104,15 @@ export function LoginPage() {
             <Button type="submit" className="h-12 w-full" disabled={submitting}>
               {submitting ? 'Ingresando…' : 'Ingresar'}
             </Button>
+
+            {/* Recuperación de contraseña (tarea 7.4): el operador la resuelve
+                solo, sin depender de que se la reseteen a mano. */}
+            <Link
+              to="/recuperar-contrasena"
+              className="text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
           </form>
         </CardContent>
       </Card>

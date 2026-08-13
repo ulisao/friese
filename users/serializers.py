@@ -19,6 +19,12 @@ class RegisterOperatorSerializer(serializers.Serializer):
     token = serializers.UUIDField()
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    # Opcional (tarea 7.4): es la única forma que tiene el operador de recuperar
+    # su contraseña solo. Sin email igual se da de alta —no todos los operadores
+    # tienen uno—, pero después depende de que el admin de su empresa se lo cargue
+    # desde el panel para poder recuperarla. No se pide en ningún doc: se agregó
+    # con la recuperación de contraseña.
+    email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate_token(self, value):
         try:
@@ -48,6 +54,7 @@ class RegisterOperatorSerializer(serializers.Serializer):
         user = User.objects.create_user(
             username=validated_data["username"],
             password=validated_data["password"],
+            email=validated_data.get("email", "").strip(),
             company=invite.company,
             role=User.OPERATOR,
         )

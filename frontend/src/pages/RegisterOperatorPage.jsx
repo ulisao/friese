@@ -22,6 +22,7 @@ export function RegisterOperatorPage() {
   const navigate = useNavigate()
 
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [error, setError] = useState(null)
@@ -42,7 +43,7 @@ export function RegisterOperatorPage() {
 
     setSubmitting(true)
     try {
-      await registerOperator({ token, username, password })
+      await registerOperator({ token, username, password, email })
     } catch (requestError) {
       // El backend explica el motivo real (invitación usada, vencida, usuario
       // repetido, contraseña débil): se muestra tal cual, que es más útil que un
@@ -98,6 +99,25 @@ export function RegisterOperatorPage() {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
               />
+            </div>
+
+            {/* Opcional (tarea 7.4): sin email, el operador que se olvida la
+                contraseña depende de que su encargado se la resetee a mano. */}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Email (opcional)</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                className="h-12"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Es lo que te va a permitir recuperar tu contraseña si te la olvidás.
+              </p>
             </div>
 
             <div className="flex flex-col gap-2">

@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NewShipmentPage } from '@/pages/NewShipmentPage'
 import { RegisterOperatorPage } from '@/pages/RegisterOperatorPage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { ShipmentDetailPage } from '@/pages/ShipmentDetailPage'
 import { ShipmentsPage } from '@/pages/ShipmentsPage'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
@@ -32,6 +34,12 @@ export default function App() {
       {/* Alta del operador: es la URL que codifica el QR que genera el admin de
           la empresa (users/invites.py). Pública: el operador todavía no existe. */}
       <Route path="/alta-operador/:token" element={<RegisterOperatorPage />} />
+
+      {/* Recuperación de contraseña (tarea 7.4). Públicas: el que se la olvidó no
+          puede entrar. Las usan tanto el operador como el admin de empresa —a este
+          último lo manda acá el login del panel de Django. */}
+      <Route path="/recuperar-contrasena" element={<ForgotPasswordPage />} />
+      <Route path="/restablecer/:uid/:token" element={<ResetPasswordPage />} />
 
       {/* Pantalla del receptor: pública, sin login. Es la ruta que arma
           emails.build_public_link() con el public_token del remito. */}
