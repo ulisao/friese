@@ -36,6 +36,8 @@ Thumbs.db
 CLAUDE.md
 PROGRESS.md
 TASK_TEMPLATE.md
-Friese_*
+# Solo los de la raíz: sin la barra, el patrón matchea a cualquier profundidad y
+# (con core.ignorecase en Windows) se comió templates/admin/friese_index.html.
+/Friese_*
 docs/
 *.docx

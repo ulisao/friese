@@ -1,0 +1,57 @@
+{% extends "admin/index.html" %}
+
+{% comment %}
+  Friese — resumen del mes en el índice del panel (tarea 10.2).
+
+  Es el `admin/index.html` nativo con un bloque arriba: el mismo listado de
+  secciones de siempre queda intacto ({{ block.super }}). Los números los arma
+  `config/admin_site.py`; acá solo se dibujan.
+{% endcomment %}
+
+{% block content %}
+{% if friese_dashboard %}
+<div class="module friese-dash">
+  <h2>
+    Resumen de {{ friese_dashboard.inicio|date:"F Y"|capfirst }}
+    {% if friese_dashboard.empresa %}— {{ friese_dashboard.empresa.name }}{% endif %}
+  </h2>
+
+  {% if friese_dashboard.empresas %}
+  {# Solo para el superadmin de Friese: el admin de empresa no elige nada. #}
+  <form method="get" class="friese-dash-filtro">
+    <label for="friese-empresa">Empresa:</label>
+    <select name="empresa" id="friese-empresa">
+      <option value="">Todas las empresas</option>
+      {% for empresa in friese_dashboard.empresas %}
+      <option value="{{ empresa.pk }}"{% if empresa.pk == friese_dashboard.empresa_id %} selected{% endif %}>{{ empresa.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="button">Ver</button>
+  </form>
+  {% endif %}
+
+  <div class="friese-dash-grid">
+    <div class="friese-kpi friese-kpi-total">
+      <span class="friese-kpi-numero">{{ friese_dashboard.total }}</span>
+      <span class="friese-kpi-label">Remitos despachados</span>
+    </div>
+    {% for tarjeta in friese_dashboard.tarjetas %}
+    <div class="friese-kpi">
+      <span class="friese-kpi-numero">{{ tarjeta.valor }}</span>
+      <span class="friese-kpi-label">{{ tarjeta.label }}</span>
+    </div>
+    {% endfor %}
+    <div class="friese-kpi">
+      <span class="friese-kpi-numero">{{ friese_dashboard.fotos }}</span>
+      <span class="friese-kpi-label">Fotos de evidencia</span>
+    </div>
+  </div>
+
+  <p class="friese-dash-nota">
+    Un remito cuenta en el mes en el que se despachó. Los borradores todavía no
+    salieron del depósito, así que no entran en el total.
+  </p>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}
