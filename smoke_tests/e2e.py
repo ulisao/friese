@@ -68,6 +68,36 @@ def check(cond, label, detail=""):
     return cond
 
 
+def borrar_historial(empresas=(), usuarios=(), remitos=()):
+    """Borra las filas de historial (tarea 8.2) que dejó un smoke test.
+
+    El historial de un registro SOBREVIVE al borrado del registro: es el punto de
+    la auditoría, no un descuido. Por eso los smoke tests, que crean y borran datos
+    de mentira contra la base REAL, tienen que limpiar también sus filas — si no,
+    la auditoría termina llena de remitos, empresas y usuarios que nunca
+    existieron, y eso es bastante peor que ruido en una tabla que se mira para
+    resolver una discusión con un cliente.
+
+    De los remitos se limpia también el historial de sus ítems y de su evidencia:
+    esas filas conservan el `shipment_id`, así que se llegan por ahí sin tener que
+    anotar los ids de antemano.
+
+    Se llama DESPUÉS de borrar los objetos —el borrado deja su propia fila de
+    baja— y con los ids tomados ANTES.
+    """
+    borradas = 0
+    remitos = list(remitos)
+    if remitos:
+        borradas += Evidence.history.filter(shipment_id__in=remitos).delete()[0]
+        borradas += ShipmentItem.history.filter(shipment_id__in=remitos).delete()[0]
+        borradas += Shipment.history.filter(id__in=remitos).delete()[0]
+    for modelo, ids in ((Company, empresas), (User, usuarios)):
+        ids = list(ids)
+        if ids:
+            borradas += modelo.history.filter(id__in=ids).delete()[0]
+    return borradas
+
+
 def summary(phase):
     print(f"\n=== {phase}: {len(OK)} OK, {len(FAIL)} fallas ===")
     for f in FAIL:
@@ -633,6 +663,9 @@ def phase_cleanup():
     if company_id:
         shipment_ids = list(Shipment.objects.filter(company_id=company_id)
                             .values_list("id", flat=True))
+        # Ids para poder limpiar el historial (tarea 8.2) después de los borrados.
+        user_ids = list(User.objects.filter(company_id=company_id)
+                        .values_list("id", flat=True))
         # Primero R2: los objetos se borran por su key, que sale del file_url.
         from shipments.storage import get_r2_client
         client = get_r2_client()
@@ -653,9 +686,13 @@ def phase_cleanup():
         borrados["usagelog"] = UsageLog.objects.filter(company_id=company_id).delete()[0]
         borrados["usuarios"] = User.objects.filter(company_id=company_id).delete()[0]
         borrados["empresa"] = Company.objects.filter(pk=company_id).delete()[0]
+        borrados["historial"] = borrar_historial(
+            empresas=[company_id], usuarios=user_ids, remitos=shipment_ids)
 
     if state.get("root_id"):
         borrados["superusuario temporal"] = User.objects.filter(pk=state["root_id"]).delete()[0]
+        borrados["historial del superusuario"] = borrar_historial(
+            usuarios=[state["root_id"]])
 
     for k, v in borrados.items():
         print(f"  borrado {k}: {v}")

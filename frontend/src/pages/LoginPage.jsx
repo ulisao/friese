@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login } from '@/lib/api'
 import { isAuthenticated, useAuthStore } from '@/store/auth'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 // El login del operador es SIEMPRE individual: usuario + contraseña propios,
 // nunca un login compartido por dispositivo (docs/desarrollo.md sección 4).
 export function LoginPage() {
+  useDocumentTitle('Ingresar')
   const authenticated = useAuthStore(isAuthenticated)
   const setSession = useAuthStore((state) => state.setSession)
   const navigate = useNavigate()

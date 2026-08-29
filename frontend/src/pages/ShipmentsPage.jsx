@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { api, logout } from '@/lib/api'
 import { SHIPMENT_STATUSES, getShipmentStatus } from '@/lib/shipmentStatus'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 import { useAuthStore } from '@/store/auth'
 
 const ALL = 'all'
@@ -32,6 +33,7 @@ function formatDate(value) {
  * acepta ?status=, así que el navegador ya tiene la lista completa.
  */
 export function ShipmentsPage() {
+  useDocumentTitle('Remitos')
   const username = useAuthStore((state) => state.username)
   const clearSession = useAuthStore((state) => state.clearSession)
 
@@ -128,12 +130,31 @@ export function ShipmentsPage() {
           </div>
         )}
 
-        {status === 'ready' && visible.length === 0 && (
-          <p className="py-8 text-sm text-muted-foreground">
-            {shipments.length === 0
-              ? 'Todavía no hay remitos.'
-              : `No hay remitos en estado «${getShipmentStatus(filter).label}».`}
-          </p>
+        {/* Estados vacíos (tarea 10.3): mensaje + la acción que sigue. Son dos casos
+            distintos y no se resuelven igual: la empresa que todavía no arrancó
+            tiene que crear su primer remito; la que filtró de más solo tiene que
+            sacar el filtro. */}
+        {status === 'ready' && visible.length === 0 && shipments.length === 0 && (
+          <div className="flex flex-col items-start gap-3 py-8" data-testid="empty-shipments">
+            <p className="text-sm text-muted-foreground">
+              Todavía no hay remitos. Creá el primero y sacale las fotos antes de que salga
+              del depósito.
+            </p>
+            <Button asChild className="h-12">
+              <Link to="/remitos/nuevo">Creá el primero</Link>
+            </Button>
+          </div>
+        )}
+
+        {status === 'ready' && visible.length === 0 && shipments.length > 0 && (
+          <div className="flex flex-col items-start gap-3 py-8" data-testid="empty-filter">
+            <p className="text-sm text-muted-foreground">
+              No hay remitos en estado «{getShipmentStatus(filter).label}».
+            </p>
+            <Button variant="outline" className="h-12" onClick={() => setFilter(ALL)}>
+              Ver todos
+            </Button>
+          </div>
         )}
 
         {status === 'ready' && visible.length > 0 && (

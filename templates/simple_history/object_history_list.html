@@ -1,0 +1,101 @@
+{# Tabla del historial de cambios (tarea 8.2).                                  #}
+{#                                                                              #}
+{# Es una copia del template de django-simple-history con los textos en         #}
+{# castellano: la librería no trae traducción al español (solo ar, cs, de, fr,  #}
+{# id, nb, pl, pt_BR, ru, uk, ur, zh) y el panel está entero en castellano desde #}
+{# la 7.3, incluida la sección de tokens de simplejwt (users/token_blacklist.py).#}
+{# `templates/` de la raíz gana sobre los templates de las apps, así que este    #}
+{# archivo pisa al de la librería sin tocar el paquete.                          #}
+{#                                                                              #}
+{# OJO: si algún día se actualiza django-simple-history, comparar este archivo   #}
+{# contra el suyo (simple_history/templates/simple_history/object_history_list   #}
+{# .html) por si le cambió alguna columna.                                       #}
+{% load i18n %}
+{% load url from simple_history_compat %}
+{% load admin_urls %}
+{% load getattribute from getattributes %}
+
+<table id="change-history" class="table table-bordered table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Registro</th>
+      {% for column in history_list_display %}
+        <th scope="col">{% trans column %}</th>
+      {% endfor %}
+      <th scope="col">Fecha y hora</th>
+      <th scope="col">Tipo</th>
+      <th scope="col">Autor del cambio</th>
+      <th scope="col">Motivo</th>
+      <th scope="col">Qué cambió</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for record in page_obj %}
+      <tr>
+        <td>
+          <a href="{% url opts|admin_urlname:'simple_history' object.pk record.pk %}">
+            {{ record.history_object }}
+          </a>
+        </td>
+        {% for column in history_list_display %}
+          <td>{{ record|getattribute:column }}</td>
+        {% endfor %}
+        <td>{{ record.history_date }}</td>
+        <td>
+          {% if record.history_type == '+' %}Alta
+          {% elif record.history_type == '-' %}Baja
+          {% else %}Modificación{% endif %}
+        </td>
+        <td>
+          {% if record.history_user %}
+            {% url admin_user_view record.history_user_id as admin_user_url %}
+            {% if admin_user_url %}
+              <a href="{{ admin_user_url }}">{{ record.history_user }}</a>
+            {% else %}
+              {{ record.history_user }}
+            {% endif %}
+          {% else %}
+            {# Sin usuario = no lo hizo una persona: una tarea periódica o un #}
+            {# comando de consola. Se dice así y no "Ninguno", que se lee como #}
+            {# un dato que falta. #}
+            Automático (sin sesión)
+          {% endif %}
+        </td>
+        <td>
+          {{ record.history_change_reason|default_if_none:"" }}
+        </td>
+        <td>
+          {% block history_delta_changes %}
+            {% if record.history_delta_changes %}
+              <ul>
+                {% for change in record.history_delta_changes %}
+                  <li>
+                    <strong>{{ change.field }}:</strong>
+                    {{ change.old }}
+                    {# Add some spacing, and prevent having the arrow point to the edge of the page if `new` is wrapped #}
+                    &nbsp;&rarr;&nbsp;&nbsp;{{ change.new }}
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endblock %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p class="paginator" style="border-top: 0">
+  {% if pagination_required %}
+    {% for i in page_range %}
+      {% if i == page_obj.paginator.ELLIPSIS %}
+        {{ page_obj.paginator.ELLIPSIS }}
+      {% elif i == page_obj.number %}
+        <span class="this-page">{{ i }}</span>
+      {% else %}
+        <a href="?{{ page_var }}={{ i }}" {% if i == page_obj.paginator.num_pages %} class="end" {% endif %}>{{ i }}</a>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  {{ page_obj.paginator.count }} {% blocktranslate count counter=page_obj.paginator.count %}entry{% plural %}entries{% endblocktranslate %}
+</p>

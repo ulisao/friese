@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from companies.admin_mixins import CompanyScopedAdminMixin
+from companies.admin_mixins import CompanyScopedAdminMixin, CompanyScopedHistoryAdmin
 
 from .models import Evidence, Shipment, ShipmentItem
 
@@ -52,8 +52,12 @@ class EvidenceInline(CompanyScopedAdminMixin, admin.TabularInline):
 
 
 @admin.register(Shipment)
-class ShipmentAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
-    """Remito. Ver docs/desarrollo.md sección 3."""
+class ShipmentAdmin(CompanyScopedHistoryAdmin):
+    """Remito. Ver docs/desarrollo.md sección 3.
+
+    Con historial de cambios (tarea 8.2): el botón "Historial", arriba a la derecha
+    de la ficha, lista cada versión con su fecha, su autor y los campos que cambiaron.
+    """
 
     company_fk_lookups = {"company": "pk", "operator": "company"}
 
@@ -95,8 +99,12 @@ class ShipmentAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(ShipmentItem)
-class ShipmentItemAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
-    """Ítem de remito (producto + cantidad). Ver docs/desarrollo.md sección 3."""
+class ShipmentItemAdmin(CompanyScopedHistoryAdmin):
+    """Ítem de remito (producto + cantidad). Ver docs/desarrollo.md sección 3.
+
+    Con historial de cambios (tarea 8.2). Se llega desde el listado de ítems: la
+    ficha del remito los muestra como inline, y un inline no tiene botón propio.
+    """
 
     company_lookup = "shipment__company"
     company_fk_lookups = {"shipment": "company", "product": "company"}
@@ -107,8 +115,12 @@ class ShipmentItemAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Evidence)
-class EvidenceAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
-    """Foto de evidencia de un remito. Ver docs/desarrollo.md sección 3."""
+class EvidenceAdmin(CompanyScopedHistoryAdmin):
+    """Foto de evidencia de un remito. Ver docs/desarrollo.md sección 3.
+
+    Con historial de cambios (tarea 8.2). En el uso normal cada foto tiene una sola
+    versión, la del alta; cualquier otra es alguien tocándola después.
+    """
 
     company_lookup = "shipment__company"
     company_fk_lookups = {
@@ -119,5 +131,8 @@ class EvidenceAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
 
     list_display = ("id", "shipment", "shipment_item", "type", "uploaded_by", "uploaded_at")
     list_filter = ("type",)
-    readonly_fields = ("uploaded_at",)
+    # file_hash lo calcula el servidor al subir la foto (tarea 8.1) y es `editable=False`
+    # en el modelo, así que el form del admin no lo trae: acá se lista para que la ficha
+    # lo MUESTRE (es el dato que se compara contra el archivo del bucket), nunca editable.
+    readonly_fields = ("file_hash", "uploaded_at")
     autocomplete_fields = ("shipment", "shipment_item", "uploaded_by")

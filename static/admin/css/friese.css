@@ -303,3 +303,94 @@ select:focus,
     background: var(--friese-indigo);
     color: #ffffff;
 }
+
+/* --- Resumen del mes en el índice (tarea 10.2) ---------------------------- */
+
+/* Va dentro de la columna del dashboard, que el admin fija en 600px. La grilla
+   se acomoda sola: 3 tarjetas por fila en el panel y 1 sola en un celular. */
+.friese-dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    padding: 16px;
+}
+
+.friese-kpi {
+    background: var(--friese-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+
+/* El total es el número que se lee primero; el resto es cómo se reparte. */
+.friese-kpi-total {
+    border-color: var(--friese-indigo);
+}
+
+.friese-kpi-numero {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--body-loud-color);
+}
+
+.friese-kpi-total .friese-kpi-numero {
+    color: var(--friese-indigo-text);
+}
+
+.friese-kpi-label {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.8125rem;
+    color: var(--body-quiet-color);
+}
+
+.friese-dash-filtro {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px 0;
+}
+
+.friese-dash-filtro label {
+    color: var(--body-quiet-color);
+}
+
+.friese-dash-filtro .button {
+    padding: 6px 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.friese-dash-nota {
+    margin: 0;
+    padding: 0 16px 14px;
+    font-size: 0.75rem;
+    color: var(--body-quiet-color);
+}
+
+/* --- Pie del panel: soporte y documentos legales (tareas 7.5 y 7.7) ------- */
+
+.friese-footer {
+    margin-top: 24px;
+    padding: 16px 40px 24px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 24px;
+    justify-content: space-between;
+    font-size: 0.8125rem;
+    color: var(--body-quiet-color);
+}
+
+.friese-footer p {
+    margin: 0;
+}
+
+/* En el login no hay barra de navegación: el pie no puede quedar pegado a la card. */
+.login .friese-footer {
+    justify-content: center;
+    border-top: none;
+    text-align: center;
+}

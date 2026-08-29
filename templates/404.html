@@ -1,0 +1,21 @@
+{% extends "errores/base.html" %}
+
+{% comment %}
+  404 del backend (tarea 10.4). Django la usa sola, sin registrar nada, apenas
+  existe un `404.html` en los templates — pero acá el que la renderiza es
+  `config.errors.page_not_found`, para que reciba el mismo contexto que la de 500.
+{% endcomment %}
+
+{% block title %}Página no encontrada | Friese{% endblock %}
+{% block codigo %}ERROR 404{% endblock %}
+{% block encabezado %}Esta página no existe{% endblock %}
+{% block mensaje %}
+  <p>
+    La dirección que abriste no corresponde a ninguna pantalla de Friese. Puede que el
+    link esté cortado o que se haya copiado de más.
+  </p>
+  <p>
+    Si llegaste desde un email con el link de un remito, abrilo de nuevo desde ahí: ese
+    link es único y no se puede escribir a mano.
+  </p>
+{% endblock %}

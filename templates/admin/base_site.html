@@ -41,3 +41,23 @@
 {% endblock %}
 
 {% block nav-global %}{% endblock %}
+
+{% comment %}
+  Pie del panel (tareas 7.5 y 7.7): a quién escribirle y los dos documentos legales.
+  El contexto lo pone `FrieseAdminSite.each_context()`, así que está en TODAS las
+  pantallas del panel, login incluido. Django dibuja acá un div vacío.
+{% endcomment %}
+{% block footer %}
+  <div id="footer" class="friese-footer">
+    <p>
+      ¿Necesitás una mano? Escribinos por
+      <a href="{{ support_whatsapp_url }}" target="_blank" rel="noopener">WhatsApp</a>
+      o a <a href="mailto:{{ support_email }}">{{ support_email }}</a>
+    </p>
+    <p>
+      <a href="{{ terminos_url }}" target="_blank" rel="noopener">Términos de Servicio</a>
+      <span aria-hidden="true">·</span>
+      <a href="{{ privacidad_url }}" target="_blank" rel="noopener">Política de Privacidad</a>
+    </p>
+  </div>
+{% endblock %}

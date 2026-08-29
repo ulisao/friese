@@ -1,4 +1,5 @@
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class Company(models.Model):
@@ -13,6 +14,37 @@ class Company(models.Model):
     # Remitos gratis restantes antes de empezar a facturar (trial).
     trial_shipments_remaining = models.IntegerField(
         "Remitos de trial restantes", default=10
+    )
+
+    # Momento en que la empresa aceptó los Términos de Servicio (tarea 8.3). La
+    # aceptación en sí pasa FUERA del sistema —contrato en papel, por email, lo
+    # que decida el abogado— porque hoy el alta es 100% manual y no hay ningún
+    # flujo de autogestión. Estos dos campos son solo el registro del hecho: los
+    # completa a mano el superadmin de Friese al cerrar cada cliente. Vacíos
+    # significa que todavía no aceptó nada.
+    terms_accepted_at = models.DateTimeField(
+        "Aceptación de los Términos",
+        null=True,
+        blank=True,
+        help_text=(
+            "Cuándo la empresa aceptó los Términos de Servicio. Se carga a mano "
+            "al cerrar el contrato; vacío = todavía no aceptó."
+        ),
+    )
+    terms_accepted_version = models.CharField(
+        "Versión aceptada",
+        max_length=20,
+        blank=True,
+        help_text="Qué versión del texto legal aceptó, p. ej. «v1».",
+    )
+
+    # Historial de cambios (tarea 8.2): quién tocó la ficha de la empresa, cuándo y
+    # qué valor tenía antes. El plan, el trial y `is_active` son decisiones de
+    # facturación de Friese: importa que quede el rastro de quién las cambió.
+    # El verbose_name es el que se ve en el selector de permisos del panel.
+    history = HistoricalRecords(
+        verbose_name="historial de empresa",
+        verbose_name_plural="historial de empresas",
     )
 
     class Meta:

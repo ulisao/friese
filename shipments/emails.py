@@ -74,6 +74,20 @@ def _from_header(company_name):
 
 _SIGNATURE = "Friese — trazabilidad de entregas con evidencia fotográfica"
 
+# Canal de soporte al pie de todos los emails (tarea 7.7). La casilla sale de
+# settings, que es el mismo lugar del que la toman las pantallas de error (10.4):
+# una sola definición para todo el backend.
+_SUPPORT_TEXT = (
+    f"¿Necesitás una mano? Escribinos por WhatsApp al "
+    f"{settings.SUPPORT_WHATSAPP_DISPLAY} o a {settings.SUPPORT_CONTACT_EMAIL}"
+)
+_SUPPORT_HTML = (
+    f'¿Necesitás una mano? Escribinos por '
+    f'<a href="{settings.SUPPORT_WHATSAPP_URL}" style="color:#4F46E5;">WhatsApp</a> '
+    f'o a <a href="mailto:{settings.SUPPORT_CONTACT_EMAIL}" style="color:#4F46E5;">'
+    f'{settings.SUPPORT_CONTACT_EMAIL}</a>.'
+)
+
 _DEADLINE_TEXT = (
     "Tenés 48 horas desde que abrís el link para responder. Si no respondés en "
     "ese plazo, el remito se cierra automáticamente como aceptado."
@@ -114,18 +128,53 @@ def _link_block_html(link, label):
     </p>"""
 
 
-def _html_document(body):
-    """Envuelve el cuerpo en la caja y el pie que comparten todos los emails."""
+def _brand_header_html():
+    """Cabecera de marca de todos los emails (tarea 10.5).
+
+    El isotipo se sirve desde el frontend (`frontend/public/friese-mark.png`), que es
+    una URL pública y estable; no hace falta una variable de entorno más.
+
+    Dos decisiones que vienen de cómo funcionan los clientes de correo:
+    - la banda es OSCURA (#1A1A22, el fondo de la marca) porque el logo es dorado y
+      blanco: sobre el fondo claro de la tarjeta, la parte blanca desaparece;
+    - el nombre "Friese" va como TEXTO al lado del isotipo, no como parte de la
+      imagen. Gmail y Outlook bloquean las imágenes remotas hasta que el lector las
+      pide, así que un email con la marca solo en el PNG llega sin marca. El `alt` de
+      la imagen también va estilado en dorado, que es lo que se ve mientras tanto.
+    """
+    logo = f"{settings.FRONTEND_PUBLIC_URL.rstrip('/')}/friese-mark.png"
+    return f"""\
+    <div style="padding:20px 24px;background-color:#1a1a22;text-align:center;">
+      <img src="{escape(logo)}" alt="Friese" width="36" height="36"
+           style="display:inline-block;vertical-align:middle;border:0;
+                  color:#d6ac31;font-weight:700;font-size:18px;">
+      <span style="display:inline-block;vertical-align:middle;padding-left:10px;
+                   font-family:Helvetica,Arial,sans-serif;font-size:20px;
+                   font-weight:700;letter-spacing:0.02em;color:#d6ac31;">Friese</span>
+    </div>"""
+
+
+def _html_document(body, soporte=True):
+    """Envuelve el cuerpo en la caja y el pie que comparten todos los emails.
+
+    `soporte=False` saca la línea de contacto: el único email que no la lleva es el
+    aviso interno de ticket nuevo (9.2), que va de Friese a la misma casilla que se
+    ofrecería como soporte.
+    """
+    soporte_html = f"<br>{_SUPPORT_HTML}" if soporte else ""
     return f"""\
 <div style="margin:0;padding:24px 12px;background-color:#f4f4f5;">
-  <div style="max-width:520px;margin:0 auto;padding:32px 24px;background-color:#ffffff;
-              border-radius:8px;font-family:Helvetica,Arial,sans-serif;font-size:16px;
+  <div style="max-width:520px;margin:0 auto;background-color:#ffffff;border-radius:8px;
+              overflow:hidden;font-family:Helvetica,Arial,sans-serif;font-size:16px;
               line-height:1.5;color:#27272a;">
+{_brand_header_html()}
+    <div style="padding:32px 24px;">
 {body}
-    <p style="margin:0;padding-top:16px;border-top:1px solid #e4e4e7;font-size:13px;
-              color:#71717a;">
-      {_SIGNATURE}
-    </p>
+      <p style="margin:0;padding-top:16px;border-top:1px solid #e4e4e7;font-size:13px;
+                color:#71717a;">
+        {_SIGNATURE}{soporte_html}
+      </p>
+    </div>
   </div>
 </div>"""
 
@@ -146,7 +195,7 @@ def _dispatch_email_content(shipment, link):
         f"{link}\n\n"
         f"{_DEADLINE_TEXT}\n\n"
         f"--\n"
-        f"{_SIGNATURE}"
+        f"{_SIGNATURE}\n{_SUPPORT_TEXT}"
     )
 
     html = _html_document(
@@ -183,7 +232,7 @@ def _reminder_email_content(shipment, link, hours):
         f"{link}\n\n"
         f"{_DEADLINE_TEXT}\n\n"
         f"--\n"
-        f"{_SIGNATURE}"
+        f"{_SIGNATURE}\n{_SUPPORT_TEXT}"
     )
 
     html = _html_document(
@@ -229,7 +278,7 @@ def _auto_close_email_content(shipment, link):
         f"Si hubo algún problema con la entrega, comunicate directamente con "
         f"{company_name}.\n\n"
         f"--\n"
-        f"{_SIGNATURE}"
+        f"{_SIGNATURE}\n{_SUPPORT_TEXT}"
     )
 
     html = _html_document(
@@ -299,7 +348,7 @@ def _dispute_email_content(shipment, photos, reported_at):
         f"Fotos de la carga recibida:\n"
         f"{text_photos}\n\n"
         f"--\n"
-        f"{_SIGNATURE}"
+        f"{_SIGNATURE}\n{_SUPPORT_TEXT}"
     )
 
     html_facts = "".join(

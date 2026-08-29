@@ -1,0 +1,20 @@
+{# Pantalla del historial de cambios (tarea 8.2). Copia del template de           #}
+{# django-simple-history con los textos en castellano; ver la nota larga en       #}
+{# object_history_list.html. El párrafo de "elegí una fecha para revertir" no      #}
+{# está: en Friese el historial no se revierte (SIMPLE_HISTORY_REVERT_DISABLED y   #}
+{# CompanyScopedHistoryAdmin), así que se explica para qué sirve la pantalla.      #}
+{% extends "admin/object_history.html" %}
+{% load i18n %}
+
+
+{% block content %}
+  <div id="content-main">
+    <div class="module">
+      {% if page_obj.object_list %}
+        {% include object_history_list_template %}
+      {% else %}
+        <p>Este registro no tiene ningún cambio guardado todavía.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

@@ -38,7 +38,7 @@ from users.models import OperatorInvite, User  # noqa: E402
 
 from browser import Browser  # noqa: E402
 from csp_server import servir  # noqa: E402
-from e2e import check, summary  # noqa: E402
+from e2e import borrar_historial, check, summary  # noqa: E402
 
 PYTHON = os.path.join(BASE_DIR, "venv", "Scripts", "python.exe")
 FRONT = "http://127.0.0.1:5174"
@@ -198,6 +198,7 @@ finally:
         navegador.close()
     if company:
         ids = list(Shipment.objects.filter(company=company).values_list("id", flat=True))
+        ids_usuarios = list(User.objects.filter(company=company).values_list("id", flat=True))
         # También se borran los objetos de R2: si no, la foto de la prueba queda
         # para siempre en el bucket sin ninguna fila que la referencie.
         from shipments.storage import get_r2_client
@@ -213,6 +214,8 @@ finally:
         OperatorInvite.objects.filter(company=company).delete()
         User.objects.filter(company=company).delete()
         Company.objects.filter(pk=company.pk).delete()
+        # El historial (8.2) no se va con su objeto: hay que limpiarlo aparte.
+        borrar_historial(empresas=[company.pk], usuarios=ids_usuarios, remitos=ids)
     servidor.shutdown()
     django_proc.terminate()
     try:

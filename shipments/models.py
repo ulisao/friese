@@ -1,4 +1,5 @@
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class Shipment(models.Model):
@@ -68,6 +69,23 @@ class Shipment(models.Model):
         "Recordatorio enviado el", null=True, blank=True
     )
 
+    # Historial de cambios (tarea 8.2). El remito despachado es lo que Friese vende
+    # como evidencia: acá queda el rastro de cualquier edición posterior, incluida
+    # la del superadmin desde el Django Admin.
+    #
+    # OJO — los cambios de estado que hace el propio producto con un UPDATE de
+    # queryset (`close_expired_shipments`, `send_pending_reminders`, y la apertura
+    # del link y el accept/dispute del receptor en `views.py`) NO pasan por save()
+    # y por lo tanto NO dejan fila en el historial. Es a propósito: esos UPDATE son
+    # condicionales y se usan como candado contra dos respuestas simultáneas; el
+    # dato en sí ya queda en los campos del remito (`status`, `dispute_reason`,
+    # `auto_closed`, `link_opened_at`...). Ver la entrada de la tarea 8.2 en
+    # PROGRESS.md.
+    history = HistoricalRecords(
+        verbose_name="historial de remito",
+        verbose_name_plural="historial de remitos",
+    )
+
     class Meta:
         verbose_name = "Remito"
         verbose_name_plural = "Remitos"
@@ -93,6 +111,15 @@ class ShipmentItem(models.Model):
     )
     quantity = models.DecimalField("Cantidad", max_digits=12, decimal_places=2)
     notes = models.TextField("Notas", blank=True)
+
+    # Historial de cambios (tarea 8.2). La tarea pedía como mínimo Shipment, y este
+    # es el modelo donde vive QUÉ decía el remito: cambiar una cantidad desde el
+    # admin no toca ninguna fila de Shipment, así que sin esto ese retoque —el más
+    # jugoso de todos— no quedaría registrado en ningún lado.
+    history = HistoricalRecords(
+        verbose_name="historial de ítem del remito",
+        verbose_name_plural="historial de ítems del remito",
+    )
 
     class Meta:
         verbose_name = "Ítem del remito"
@@ -140,8 +167,29 @@ class Evidence(models.Model):
         verbose_name="Subida por",
     )
     file_url = models.URLField("URL de la foto", max_length=1000)
+    # SHA-256 (64 hex) del archivo TAL COMO LLEGÓ al servidor, calculado antes de
+    # subirlo a R2 (tarea 8.1). Es la huella que permite probar más adelante que la
+    # foto que está en el bucket es exactamente la que subió el dispositivo.
+    # editable=False: lo calcula SIEMPRE el servidor. Ni el cliente por la API ni el
+    # admin a mano pueden escribirlo, que es justamente lo que le da valor probatorio.
+    # Vacío solo en las evidencias anteriores a esta tarea (no se recalculan: un hash
+    # sacado del archivo ya guardado en R2 no probaría nada sobre lo que llegó).
+    file_hash = models.CharField(
+        "Hash SHA-256", max_length=64, blank=True, editable=False
+    )
     # Timestamp del servidor: fuente de verdad de la evidencia.
     uploaded_at = models.DateTimeField("Fecha de subida", auto_now_add=True)
+
+    # Historial de cambios (tarea 8.2). En el uso normal cada evidencia tiene UNA
+    # sola fila de historial, la del alta: la foto se sube y no se vuelve a tocar.
+    # Justamente por eso cualquier fila de más —o una de baja— es la señal de que
+    # alguien retocó la evidencia después, que es lo que esta tarea tiene que dejar
+    # a la vista. Va junto al `file_hash` de la 8.1: el hash prueba que el archivo
+    # de R2 es el que llegó; el historial, que la fila que lo referencia no cambió.
+    history = HistoricalRecords(
+        verbose_name="historial de evidencia",
+        verbose_name_plural="historial de evidencia",
+    )
 
     class Meta:
         verbose_name = "Evidencia"

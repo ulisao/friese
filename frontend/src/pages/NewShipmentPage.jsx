@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /*
  * Alta de un remito en draft (tarea 2.7): datos del receptor + productos.
@@ -20,6 +21,7 @@ import { api } from '@/lib/api'
  * La cámara y el despacho son la tarea 2.8: acá el remito queda en draft.
  */
 export function NewShipmentPage() {
+  useDocumentTitle('Nuevo remito')
   const navigate = useNavigate()
 
   const [receiverName, setReceiverName] = useState('')
@@ -219,10 +221,21 @@ export function NewShipmentPage() {
                 </div>
               )}
 
+              {/* Catálogo vacío (tarea 10.3). El operador no puede cargar productos
+                  —la API solo los lista (catalog/views.py)—, así que la salida no es
+                  un alta acá: es avisar quién los carga y ofrecer recargar la lista
+                  para cuando el admin ya los haya dado de alta. */}
               {productsStatus === 'ready' && products.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Tu empresa todavía no tiene productos cargados.
-                </p>
+                <div className="flex flex-col items-start gap-3" data-testid="empty-products">
+                  <p className="text-sm text-muted-foreground">
+                    Tu empresa todavía no tiene productos cargados. Los da de alta el admin
+                    desde el panel; mientras tanto podés guardar el borrador solo con los datos
+                    del receptor.
+                  </p>
+                  <Button type="button" variant="outline" className="h-12" onClick={loadProducts}>
+                    Actualizar la lista
+                  </Button>
+                </div>
               )}
 
               {productsStatus === 'ready' && products.length > 0 && (
@@ -239,9 +252,19 @@ export function NewShipmentPage() {
                   </div>
 
                   {matches.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Ningún producto coincide con la búsqueda.
-                    </p>
+                    <div className="flex flex-col items-start gap-3" data-testid="empty-search">
+                      <p className="text-sm text-muted-foreground">
+                        Ningún producto coincide con «{search.trim()}».
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-12"
+                        onClick={() => setSearch('')}
+                      >
+                        Borrar la búsqueda
+                      </Button>
+                    </div>
                   ) : (
                     <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
                       {matches.map((product) => (
@@ -308,6 +331,15 @@ export function NewShipmentPage() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* La lista de lo que ya se agregó. Vacía no desaparecía: quedaba un
+                  hueco sin explicación entre el selector y el botón de guardar
+                  (tarea 10.3). No lleva acción: la acción es el selector de arriba. */}
+              {items.length === 0 && productsStatus === 'ready' && products.length > 0 && (
+                <p className="border-t pt-4 text-sm text-muted-foreground" data-testid="empty-items">
+                  Todavía no agregaste productos a este remito.
+                </p>
               )}
 
               {items.length > 0 && (

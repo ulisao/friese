@@ -29,6 +29,11 @@ admin.site.index_title = "Administración"
 # /api/). Se lo manda a la app del frontend, que es el sitio real del producto.
 admin.site.site_url = settings.FRONTEND_PUBLIC_URL
 
+# Pantallas de error con la marca (tarea 10.4). Se reemplazan las VISTAS y no solo
+# los templates porque la de 500 de Django renderiza sin contexto: ver config/errors.py.
+handler404 = 'config.errors.page_not_found'
+handler500 = 'config.errors.server_error'
+
 urlpatterns = [
     # "¿Perdiste tu contraseña?" en el login del panel (tarea 7.4). El template de
     # login del admin dibuja ese link solo si existe una URL llamada

@@ -163,7 +163,7 @@ class ShipmentViewSet(
 
         # Primero R2: si la subida falla (502), no queda un Evidence apuntando a un
         # archivo inexistente ni se suma una foto al UsageLog.
-        file_url = upload_evidence_file(
+        file_url, file_hash = upload_evidence_file(
             payload.validated_data["file"], shipment, evidence_type
         )
         evidence = Evidence.objects.create(
@@ -172,6 +172,9 @@ class ShipmentViewSet(
             type=evidence_type,
             uploaded_by=request.user,
             file_url=file_url,
+            # SHA-256 del archivo tal como llegó, calculado antes de la subida (8.1).
+            # Se guarda en el mismo INSERT que el file_url y el uploaded_at.
+            file_hash=file_hash,
         )
         return Response(
             EvidenceSerializer(evidence).data, status=status.HTTP_201_CREATED
@@ -411,7 +414,7 @@ class PublicReceptionEvidenceView(PublicShipmentResponseView):
             shipment, payload.validated_data.get("shipment_item")
         )
 
-        file_url = upload_evidence_file(
+        file_url, file_hash = upload_evidence_file(
             payload.validated_data["file"], shipment, Evidence.RECEPTION
         )
         evidence = Evidence.objects.create(
@@ -420,6 +423,8 @@ class PublicReceptionEvidenceView(PublicShipmentResponseView):
             type=Evidence.RECEPTION,
             uploaded_by=None,
             file_url=file_url,
+            # Igual que en el despacho: el hash lo calcula el servidor (tarea 8.1).
+            file_hash=file_hash,
         )
         return Response(
             PublicEvidenceSerializer(evidence).data, status=status.HTTP_201_CREATED

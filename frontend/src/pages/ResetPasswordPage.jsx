@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { confirmPasswordReset } from '@/lib/api'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /*
  * Paso 2 de la recuperación de contraseña (tarea 7.4): elegir la nueva.
@@ -19,6 +20,7 @@ import { confirmPasswordReset } from '@/lib/api'
  * admin de empresa entra por el panel, no por acá.
  */
 export function ResetPasswordPage() {
+  useDocumentTitle('Elegir una contraseña nueva')
   const { uid, token } = useParams()
 
   const [password, setPassword] = useState('')

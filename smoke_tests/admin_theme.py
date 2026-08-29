@@ -34,7 +34,7 @@ from users.groups import ensure_company_admin_group  # noqa: E402
 from users.models import User  # noqa: E402
 
 from browser import Browser  # noqa: E402
-from e2e import check, summary  # noqa: E402
+from e2e import borrar_historial, check, summary  # noqa: E402
 
 PYTHON = os.path.join(BASE_DIR, "venv", "Scripts", "python.exe")
 ADMIN = "http://127.0.0.1:8000/admin"
@@ -298,8 +298,11 @@ try:
           " | ".join(errores)[:200])
 
 finally:
+    ids_creados = [u.pk for u in creados]
     for usuario in creados:
         usuario.delete()
+    # El historial (8.2) no se va con su objeto: hay que limpiarlo aparte.
+    borrar_historial(usuarios=ids_creados)
     if nav is not None:
         nav.close()
     servidor.terminate()

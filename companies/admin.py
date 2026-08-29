@@ -1,23 +1,31 @@
 from django.contrib import admin
 
-from .admin_mixins import CompanyScopedAdminMixin
+from .admin_mixins import CompanyScopedAdminMixin, CompanyScopedHistoryAdmin
 from .forms import CompanyWithFirstAdminForm
 from .models import Company, UsageLog
 
 
 @admin.register(Company)
-class CompanyAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
+class CompanyAdmin(CompanyScopedHistoryAdmin):
     """Empresa (tenant). Ver docs/desarrollo.md sección 3.
 
     El admin de una empresa solo ve su propia ficha; el superadmin las ve todas.
     El ALTA es del superadmin de Friese y crea la empresa junto con su primer
     admin en un solo formulario (tarea 4.4).
+
+    Con historial de cambios (tarea 8.2): el plan, el trial y el `is_active` los
+    decide Friese, y el botón "Historial" deja registrado quién los tocó y cuándo.
+    Lo mismo vale para la aceptación de los Términos (tarea 8.3), que se carga a
+    mano acá y es el único registro del momento en que se cerró el contrato.
     """
 
     # Company ES el tenant: el filtro va contra su propia PK.
     company_lookup = "pk"
 
-    list_display = ("name", "email", "plan", "is_active", "trial_shipments_remaining", "created_at")
+    list_display = (
+        "name", "email", "plan", "is_active", "trial_shipments_remaining",
+        "terms_accepted_at", "created_at",
+    )
     list_filter = ("is_active", "plan")
     search_fields = ("name", "email")
     ordering = ("name",)
@@ -25,8 +33,12 @@ class CompanyAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
 
     # Campos que decide Friese, no el cliente: el admin de la empresa los ve en
     # su ficha pero no puede editarlos (su propio trial y su plan son
-    # facturación, y desactivarse a sí misma tampoco es decisión suya).
-    friese_only_fields = ("plan", "is_active", "trial_shipments_remaining")
+    # facturación, desactivarse a sí misma tampoco es decisión suya, y la
+    # aceptación del contrato es el registro que lleva Friese, no el cliente).
+    friese_only_fields = (
+        "plan", "is_active", "trial_shipments_remaining",
+        "terms_accepted_at", "terms_accepted_version",
+    )
 
     # Alta de empresa + primer admin en una sola pantalla.
     add_form = CompanyWithFirstAdminForm
@@ -43,6 +55,18 @@ class CompanyAdmin(CompanyScopedAdminMixin, admin.ModelAdmin):
                     "Toda empresa nueva arranca con 10 remitos de trial. Cada "
                     "despacho descuenta 1; al llegar a 0 los remitos siguientes "
                     "cuentan para facturación según el tier del mes."
+                ),
+            },
+        ),
+        (
+            "Contrato",
+            {
+                "fields": ("terms_accepted_at", "terms_accepted_version"),
+                "description": (
+                    "La aceptación de los Términos se acuerda FUERA del sistema "
+                    "(contrato firmado, email, lo que sea): acá solo queda el "
+                    "registro de cuándo pasó. Se puede cargar después, editando "
+                    "la empresa."
                 ),
             },
         ),

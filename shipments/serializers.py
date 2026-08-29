@@ -46,7 +46,10 @@ class EvidenceSerializer(serializers.ModelSerializer):
     uploaded_by es el usuario autenticado y uploaded_at es el timestamp del servidor
     (auto_now_add), que el spec marca como fuente de verdad de la evidencia.
     shipment_item es opcional: dice a qué producto del remito corresponde la foto
-    (null = documenta el remito completo).
+    (null = documenta el remito completo). file_hash es el SHA-256 del archivo tal como
+    llegó al servidor (tarea 8.1): viaja de vuelta para que el cliente pueda verificar
+    la foto que acaba de subir, pero NUNCA se acepta desde el payload — un hash que
+    manda el cliente no probaría nada.
     """
 
     class Meta:
@@ -58,6 +61,7 @@ class EvidenceSerializer(serializers.ModelSerializer):
             "type",
             "uploaded_by",
             "file_url",
+            "file_hash",
             "uploaded_at",
         ]
         read_only_fields = fields

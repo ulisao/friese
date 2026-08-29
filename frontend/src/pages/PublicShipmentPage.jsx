@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 
 import { CameraCapture } from '@/components/CameraCapture'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { publicApi } from '@/lib/api'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
@@ -52,6 +53,11 @@ export function PublicShipmentPage() {
 
   const [shipment, setShipment] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'notfound' | 'error'
+
+  // Título de la pestaña (10.5). El receptor abre el link desde su email: que la
+  // pestaña diga qué remito es lo ayuda a no perderlo entre las demás. Hasta que
+  // carga —o si el link no existe— alcanza con "Remito".
+  useDocumentTitle(shipment ? `Remito #${shipment.id}` : 'Remito')
 
   // Fotos sacadas por el receptor que todavía no confirmó el backend.
   // { key, previewUrl, blob, itemId, state: 'uploading' | 'error' }
@@ -530,6 +536,23 @@ export function PublicShipmentPage() {
         {/* Los dos CTA, diferenciados por el color de estado: verde = accepted,
             rojo = disputed (docs/diseno.md secciones 2 y 5). Los dos llevan el texto
             en el fondo base oscuro: sobre red-500 el blanco da 3.81, bajo WCAG AA. */}
+        {/* Consentimiento del receptor (tarea 7.6). Va ACÁ, pegado a los dos botones y
+            antes de cualquier acción: es el último momento en que se lee algo antes de
+            responder o de abrir la cámara. Dos renglones y un link, no un modal: el
+            receptor no se registró en nada y no se le puede poner un muro legal
+            adelante de la única acción que vino a hacer. */}
+        {canRespond && (
+          <p className="text-xs leading-relaxed text-muted-foreground" data-testid="privacy-notice">
+            Al responder, tu respuesta y las fotos que saques quedan registradas —con la fecha y
+            la hora— como evidencia de esta entrega, y quedan a disposición de la empresa que te
+            la despachó.{' '}
+            <Link className="underline" to="/privacidad">
+              Ver la Política de Privacidad
+            </Link>
+            .
+          </p>
+        )}
+
         {canRespond && !reporting && (
           <div className="flex flex-col gap-3">
             <Button

@@ -2,6 +2,7 @@ import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class User(AbstractUser):
@@ -27,6 +28,23 @@ class User(AbstractUser):
         verbose_name="Empresa",
     )
     role = models.CharField("Rol", max_length=20, choices=ROLE_CHOICES, blank=True)
+
+    # Historial de cambios (tarea 8.2): a quién le cambiaron la empresa, el rol, el
+    # `is_active` o los permisos, quién se lo cambió y cuándo. Es lo que permite
+    # explicar después por qué un remito quedó firmado por tal operador.
+    #
+    # `password` queda EXCLUIDO a propósito: el hash no aporta nada a la auditoría y
+    # copiarlo dejaría todas las contraseñas viejas de todos los usuarios en una
+    # segunda tabla (y en cada dump del backup). El HECHO del cambio igual queda
+    # registrado —simple_history escribe una fila por cada save—, con su fecha y su
+    # autor; lo único que no se guarda es el hash anterior. Una fila del historial
+    # sin ningún campo en la columna "Changes" es, casi siempre, un cambio de
+    # contraseña.
+    history = HistoricalRecords(
+        excluded_fields=["password"],
+        verbose_name="historial de usuario",
+        verbose_name_plural="historial de usuarios",
+    )
 
     class Meta(AbstractUser.Meta):
         verbose_name = "Usuario"

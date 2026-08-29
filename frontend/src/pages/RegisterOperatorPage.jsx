@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, registerOperator } from '@/lib/api'
 import { isAuthenticated, useAuthStore } from '@/store/auth'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /*
  * Alta inicial del operador: es la pantalla a la que lleva el QR que le muestra
@@ -16,6 +17,7 @@ import { isAuthenticated, useAuthStore } from '@/store/auth'
  * Por eso, creada la cuenta, se entra con usuario y contraseña como siempre.
  */
 export function RegisterOperatorPage() {
+  useDocumentTitle('Alta de operador')
   const { token } = useParams()
   const authenticated = useAuthStore(isAuthenticated)
   const setSession = useAuthStore((state) => state.setSession)

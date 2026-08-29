@@ -11,7 +11,7 @@ from rest_framework_simplejwt.token_blacklist.admin import (
 )
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
-from companies.admin_mixins import CompanyScopedAdminMixin
+from companies.admin_mixins import CompanyScopedAdminMixin, CompanyScopedHistoryAdmin
 
 from .groups import ensure_company_admin_group
 from .invites import build_invite_qr_svg, build_invite_url
@@ -19,13 +19,17 @@ from .models import OperatorInvite, User
 
 
 @admin.register(User)
-class UserAdmin(CompanyScopedAdminMixin, DjangoUserAdmin):
+class UserAdmin(CompanyScopedHistoryAdmin, DjangoUserAdmin):
     """User extendido. Reusa el UserAdmin nativo (maneja el hash de password)
     y agrega company + role. Ver docs/desarrollo.md sección 3.
 
     El acceso al panel se deriva del `role` (tarea 4.4): role=admin queda staff
     y en el grupo "Admin de empresa"; role=operator no entra al panel (usa la app
     de React).
+
+    Con historial de cambios (tarea 8.2). Un login del panel también deja fila
+    (Django escribe `last_login` al entrar): es ruido esperable, y de paso queda
+    el registro de cuándo entró cada uno.
     """
 
     company_fk_lookups = {"company": "pk"}

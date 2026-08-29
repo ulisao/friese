@@ -45,6 +45,13 @@ COMPANY_ADMIN_PERMISSIONS = (
     "shipments.view_shipment",
     "shipments.view_shipmentitem",
     "shipments.view_evidence",
+    # Tickets de soporte (tarea 9.1): abre los suyos y puede ampliarlos
+    # después. Sin delete: un ticket es el registro de un pedido, no se borra.
+    # El `status` lo mueve solo Friese, y eso lo asegura el admin (readonly),
+    # no los permisos: cambiar el estado es un `change` como cualquier otro.
+    "support.view_supportticket",
+    "support.add_supportticket",
+    "support.change_supportticket",
     # Revocar el refresh token de un operador puntual, p. ej. por un celular
     # perdido (sección 4). Los OutstandingToken son de solo lectura.
     "token_blacklist.view_outstandingtoken",

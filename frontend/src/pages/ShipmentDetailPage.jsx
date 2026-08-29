@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { api } from '@/lib/api'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
@@ -47,6 +48,9 @@ function formatDate(value) {
  */
 export function ShipmentDetailPage() {
   const { id } = useParams()
+  // El número va en el título de la pestaña (10.5): con dos remitos abiertos en dos
+  // pestañas, es lo único que las distingue.
+  useDocumentTitle(`Remito #${id}`)
 
   const [shipment, setShipment] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'error'
@@ -307,7 +311,14 @@ export function ShipmentDetailPage() {
           </CardHeader>
           <CardContent className="p-0">
             {items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Este remito no tiene productos.</p>
+              /* Sin acción a propósito (tarea 10.3): los productos se cargan al crear
+                 el remito y esta pantalla no los edita, así que un botón acá mentiría.
+                 Lo que sí se dice es que el remito se puede despachar igual. */
+              <p className="text-sm text-muted-foreground" data-testid="empty-items">
+                {isDraft
+                  ? 'Este remito no tiene productos cargados. Podés sacarle fotos del remito completo y despacharlo igual.'
+                  : 'Este remito se despachó sin productos detallados.'}
+              </p>
             ) : (
               <ul className="flex flex-col gap-2" data-testid="shipment-items">
                 {items.map((item) => {

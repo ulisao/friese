@@ -53,7 +53,7 @@ from users.models import OperatorInvite, User  # noqa: E402
 from users.password_reset import usuarios_para  # noqa: E402
 
 from browser import Browser  # noqa: E402
-from e2e import check, summary  # noqa: E402
+from e2e import borrar_historial, check, summary  # noqa: E402
 
 PYTHON = os.path.join(BASE_DIR, "venv", "Scripts", "python.exe")
 FRONT = "http://localhost:5173"
@@ -438,10 +438,13 @@ finally:
         navegador.close()
     limpiar_throttle()
     if company:
+        ids_usuarios = list(User.objects.filter(company=company).values_list("id", flat=True))
         OperatorInvite.objects.filter(company=company).delete()
         User.objects.filter(company=company).delete()
         UsageLog.objects.filter(company=company).delete()
         Company.objects.filter(pk=company.pk).delete()
+        # El historial (8.2) no se va con su objeto: hay que limpiarlo aparte.
+        borrar_historial(empresas=[company.pk], usuarios=ids_usuarios)
         print("\nDatos de prueba borrados.")
     for proc in procesos:
         proc.terminate()

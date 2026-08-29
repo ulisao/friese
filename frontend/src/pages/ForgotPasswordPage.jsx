@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { requestPasswordReset } from '@/lib/api'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /*
  * Paso 1 de la recuperación de contraseña (tarea 7.4): a dónde mandamos el link.
@@ -18,6 +19,7 @@ import { requestPasswordReset } from '@/lib/api'
  * averiguar qué usuarios hay.
  */
 export function ForgotPasswordPage() {
+  useDocumentTitle('Recuperar contraseña')
   const [identifier, setIdentifier] = useState('')
   const [enviado, setEnviado] = useState(false)
   const [error, setError] = useState(null)

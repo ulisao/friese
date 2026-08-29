@@ -35,7 +35,7 @@ from shipments.models import Evidence, Shipment  # noqa: E402
 from users.invites import build_invite_qr_svg, build_invite_url  # noqa: E402
 from users.models import OperatorInvite, User  # noqa: E402
 
-from e2e import check, summary  # noqa: E402
+from e2e import borrar_historial, check, summary  # noqa: E402
 
 PYTHON = os.path.join(BASE_DIR, "venv", "Scripts", "python.exe")
 PUERTO = 8021
@@ -166,6 +166,7 @@ finally:
     # --- Limpieza: base y R2 ---------------------------------------------
     if company:
         ids = list(Shipment.objects.filter(company=company).values_list("id", flat=True))
+        ids_usuarios = list(User.objects.filter(company=company).values_list("id", flat=True))
         from shipments.storage import get_r2_client
         cliente = get_r2_client()
         base = settings.R2_PUBLIC_BASE_URL.rstrip("/") + "/"
@@ -178,8 +179,11 @@ finally:
         OperatorInvite.objects.filter(company=company).delete()
         User.objects.filter(company=company).delete()
         Company.objects.filter(pk=company.pk).delete()
+        # El historial (8.2) no se va con su objeto: hay que limpiarlo aparte.
+        borrar_historial(empresas=[company.pk], usuarios=ids_usuarios, remitos=ids)
     if admin_user:
         User.objects.filter(pk=admin_user.pk).delete()
+        borrar_historial(usuarios=[admin_user.pk])
     proc.terminate()
     try:
         proc.wait(timeout=10)

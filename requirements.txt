@@ -23,6 +23,11 @@ python-dotenv==1.2.2
 # Tareas periódicas (cierre automático de remitos vencidos)
 django-crontab==0.7.1
 
+# Historial de cambios de los modelos sensibles (tarea 8.2). OJO con la versión:
+# de la 3.13 en adelante pide Django >= 5.2 y `pip install` se lleva puesto el
+# Django 5.1.15 de arriba. La 3.12.0 es la última que soporta Django 5.1.
+django-simple-history==3.12.0
+
 # Almacenamiento (Cloudflare R2 vía S3) y emails (Resend)
 boto3==1.43.67
 resend==2.35.0

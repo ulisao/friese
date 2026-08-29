@@ -1,0 +1,21 @@
+{% extends "errores/base.html" %}
+
+{% comment %}
+  500 del backend (tarea 10.4). La renderiza `config.errors.server_error`.
+  Sin datos del error a la vista: el detalle va al log del servidor, no a la
+  pantalla de quien se lo comió.
+{% endcomment %}
+
+{% block title %}Error del servidor | Friese{% endblock %}
+{% block codigo %}ERROR 500{% endblock %}
+{% block encabezado %}Se nos rompió algo{% endblock %}
+{% block mensaje %}
+  <p>
+    No es culpa tuya: falló algo de nuestro lado y ya nos quedó registrado. Probá de
+    nuevo en un rato.
+  </p>
+  <p>
+    Si estabas despachando un remito, revisá la lista antes de volver a cargarlo: puede
+    haber quedado guardado igual.
+  </p>
+{% endblock %}

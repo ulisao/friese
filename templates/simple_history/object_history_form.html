@@ -1,0 +1,45 @@
+{# Ficha de UNA versión vieja de un registro (tarea 8.2). Copia del template de   #}
+{# django-simple-history con dos arreglos; ver la nota larga en                   #}
+{# object_history_list.html.                                                      #}
+{#                                                                                #}
+{# 1. Las migas de pan: la librería escribe el app_label crudo ("Shipments") y un  #}
+{#    "View <modelo>" en inglés. Se usa el verbose_name de la app —el mismo que    #}
+{#    muestra el resto del panel desde la 7.3— y castellano en el último tramo.    #}
+{# 2. El párrafo de arriba explicaba cómo revertir. Acá no se revierte             #}
+{#    (SIMPLE_HISTORY_REVERT_DISABLED + CompanyScopedHistoryAdmin), así que dice   #}
+{#    qué es lo que se está mirando.                                              #}
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+{% load url from simple_history_compat %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url "admin:index" %}">{% trans "Home" %}</a> &rsaquo;
+    <a href="{% url "admin:app_list" app_label %}">{{ original_opts.app_config.verbose_name|capfirst|escape }}</a> &rsaquo;
+    <a href="{{changelist_url}}">{{original_opts.verbose_name_plural|capfirst}}</a> &rsaquo;
+    <a href="{{change_url}}">{{original|truncatewords:"18"}}</a> &rsaquo;
+    <a href="../">Historial</a> &rsaquo;
+    Versión guardada
+  </div>
+{% endblock %}
+
+{% block submit_buttons_top %}
+  {% include "simple_history/submit_line.html" %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+  {% include "simple_history/submit_line.html" %}
+{% endblock %}
+
+{% block object-tools-items %}
+{# We override this block from the django template to fix up the history link #}
+<li>
+    <a href="{% add_preserved_filters history_url %}" class="historylink">{% translate "History" %}</a>
+</li>
+{% if has_absolute_url %}<li><a href="{{ absolute_url }}" class="viewsitelink">{% translate "View on site" %}</a></li>{% endif %}
+{% endblock %}
+
+{% block form_top %}
+<p>Así estaba este registro en esa fecha. Es una consulta: desde acá no se
+  modifica ni se restaura nada.</p>
+{% endblock %}

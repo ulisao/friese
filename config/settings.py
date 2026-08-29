@@ -115,7 +115,14 @@ ALLOWED_HOSTS = split_csv(
 # Application definition
 
 DJANGO_APPS = [
-    'django.contrib.admin',
+    # El admin va por su AppConfig propia (tarea 10.2) en vez de por
+    # 'django.contrib.admin' a secas: es el mecanismo que documenta Django para
+    # que `admin.site` sea otro AdminSite —acá el que agrega el resumen del mes
+    # arriba del índice—. La app instalada sigue siendo la misma
+    # (`FrieseAdminConfig.name == 'django.contrib.admin'`): no hay migraciones ni
+    # cambios de permisos, y todos los `@admin.register` siguen registrando
+    # contra `admin.site`, sin tocar ni un ModelAdmin.
+    'config.apps.FrieseAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -136,6 +143,10 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     # Tareas periódicas sobre el cron del sistema (ver CRONJOBS más abajo).
     'django_crontab',
+    # Historial de cambios de los modelos sensibles (tarea 8.2). Cada modelo con
+    # `HistoricalRecords()` gana una tabla `historical_*` que guarda una fila por
+    # cada save/delete, con el usuario y la fecha. Ver SIMPLE_HISTORY_* más abajo.
+    'simple_history',
 ]
 
 LOCAL_APPS = [
@@ -143,6 +154,9 @@ LOCAL_APPS = [
     'users',
     'catalog',
     'shipments',
+    # Tickets de soporte de las empresas (tarea 9.1). Se atienden desde el panel;
+    # no tiene endpoints de API ni pantalla propia en el frontend.
+    'support',
     # Infraestructura, no dominio: no tiene modelos ni endpoints. Hoy vive acá el
     # backup de la base (tarea 7.1, `manage.py backup_database`).
     'ops',
@@ -161,6 +175,13 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Historial de cambios (tarea 8.2): deja la request en un thread-local para que
+    # el historial sepa QUIÉN guardó. Va después de AuthenticationMiddleware porque
+    # necesita `request.user`. Cubre los dos caminos de escritura: el form del admin
+    # (sesión) y la API del operador (JWT — DRF escribe el usuario autenticado sobre
+    # la misma HttpRequest que guarda este middleware). Un guardado sin request
+    # —los crons, un `shell`— queda con usuario vacío, que es la lectura correcta.
+    'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -360,10 +381,24 @@ REFRESH_COOKIE_PATH = env("REFRESH_COOKIE_PATH", "/api/auth/")
 CORS_ALLOW_CREDENTIALS = True
 
 
-# Base del frontend público (receptor): con esto se arma el link del remito que
-# se le envía al receptor al despachar. La pantalla del receptor (tarea 3.4) vive
-# en la MISMA app de Vite que la del operador, en la ruta pública /remito/{token},
-# así que en desarrollo el default es el dev server de Vite. En producción es
+# --- Historial de cambios (tarea 8.2) ---------------------------------------
+#
+# El historial es un LIBRO DE REGISTRO, no una papelera: se mira, no se deshace.
+# Con esto la ficha de cada versión vieja se ve en modo consulta y desaparece el
+# botón "Revert" de simple_history. OJO: la librería solo usa este flag para
+# esconder el botón en el template — el POST de la vista sigue existiendo, así que
+# quien lo bloquea de verdad es `CompanyScopedHistoryAdmin` en
+# `companies/admin_mixins.py`. Los dos van juntos a propósito.
+SIMPLE_HISTORY_REVERT_DISABLED = True
+
+
+# Base del frontend: con esto se arman TODOS los links del backend hacia la app
+# —el remito del receptor (/remito/{token}, tarea 3.4), la invitación por QR
+# (/alta-operador/{token}), la recuperación de contraseña (/recuperar-contrasena
+# y /restablecer/{uid}/{token}, tarea 7.4) y el "Ver sitio" del panel—. Es una
+# sola variable a propósito: el operador y el receptor salen de la MISMA app de
+# Vite, así que no hay un segundo origen que configurar.
+# En desarrollo el default es el dev server de Vite. En producción es
 # obligatoria: con el default, todos los emails saldrían con un link a localhost.
 FRONTEND_PUBLIC_URL = env_required_in_production(
     "FRONTEND_PUBLIC_URL", "http://localhost:5173"
@@ -385,6 +420,35 @@ RESEND_API_KEY = env_required_in_production("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = env_required_in_production(
     "RESEND_FROM_EMAIL", "onboarding@resend.dev"
 )
+
+# Casillas de Friese que reciben el aviso cuando una empresa abre un ticket de
+# soporte (tarea 9.2), separadas por coma. Va a Friese, no a la empresa, así que
+# ese envío NO se cuenta en el UsageLog (ver support/emails.py).
+# No es obligatoria: si está vacía el ticket se crea igual y la falta de
+# destinatario queda en el log — un aviso interno no puede tirar abajo el alta.
+# Pero sin ella hay que volver a mirar el panel a mano, que es justo lo que la
+# tarea saca del medio: en producción hay que definirla.
+SUPPORT_NOTIFICATION_EMAIL = env("SUPPORT_NOTIFICATION_EMAIL")
+
+# Canal de soporte que se le muestra AL USUARIO: pantallas de error (10.4), pie de
+# los emails y pie del panel (7.7). Son los MISMOS datos que publica la landing
+# (frieselanding/lib/site.ts): el que recibe un email y después entra a la web
+# tiene que encontrar el mismo contacto en los dos lados.
+#
+# Van como constantes y no como variables de entorno: es información pública, no
+# cambia por ambiente, y una variable más es una variable más para olvidarse de
+# cargar en Railway — con el agravante de que si queda vacía, la pantalla de error
+# no dice a dónde escribir.
+#
+# OJO — `contacto@friese.com.ar` todavía NO recibe correo: el dominio no tiene
+# registros MX (verificado contra 1.1.1.1 y 8.8.8.8 el 2026-08-29). Hasta que se
+# configure el reenvío, el canal que funciona de verdad es el WhatsApp. Por eso
+# los dos van siempre juntos.
+# El frontend tiene los mismos datos en `frontend/src/lib/support.js`.
+SUPPORT_CONTACT_EMAIL = "contacto@friese.com.ar"
+SUPPORT_WHATSAPP_NUMBER = "5493472430136"  # formato wa.me: solo dígitos
+SUPPORT_WHATSAPP_URL = f"https://wa.me/{SUPPORT_WHATSAPP_NUMBER}"
+SUPPORT_WHATSAPP_DISPLAY = "+54 9 3472 43-0136"
 
 
 # Horas que tienen que pasar desde el despacho, sin que el receptor abra el link,

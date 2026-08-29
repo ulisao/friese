@@ -30,7 +30,7 @@ from shipments.models import Evidence, Shipment  # noqa: E402
 from users.models import OperatorInvite, User  # noqa: E402
 
 from browser import Browser  # noqa: E402
-from e2e import API, BACKEND, FRONTEND, check, summary  # noqa: E402
+from e2e import API, BACKEND, FRONTEND, borrar_historial, check, summary  # noqa: E402
 
 TAG = "SMOKE71"
 company = navegador = None
@@ -125,11 +125,14 @@ finally:
         navegador.close()
     if company:
         ids = list(Shipment.objects.filter(company=company).values_list("id", flat=True))
+        ids_usuarios = list(User.objects.filter(company=company).values_list("id", flat=True))
         Evidence.objects.filter(shipment_id__in=ids).delete()
         Shipment.objects.filter(company=company).delete()
         Product.objects.filter(company=company).delete()
         OperatorInvite.objects.filter(company=company).delete()
         User.objects.filter(company=company).delete()
         Company.objects.filter(pk=company.pk).delete()
+        # El historial (8.2) no se va con su objeto: hay que limpiarlo aparte.
+        borrar_historial(empresas=[company.pk], usuarios=ids_usuarios, remitos=ids)
 
 sys.exit(summary("6.7 en producción, con api.friese.com.ar"))

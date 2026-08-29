@@ -24,6 +24,7 @@ from shipments.emails import (
     _from_header,
     _html_document,
     _link_block_html,
+    _SUPPORT_TEXT,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,8 @@ def _reset_email_content(user, link, hours, admin_url):
         f"Si no pediste esto, ignorá el email: tu contraseña sigue siendo la de "
         f"siempre.\n\n"
         f"--\n"
-        f"Friese — trazabilidad de entregas con evidencia fotográfica"
+        f"Friese — trazabilidad de entregas con evidencia fotográfica\n"
+        f"{_SUPPORT_TEXT}"
     )
 
     html = _html_document(

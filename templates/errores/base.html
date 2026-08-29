@@ -1,0 +1,98 @@
+{% comment %}
+  Friese — esqueleto de las pantallas de error del backend (tarea 10.4).
+
+  Reglas de este archivo:
+
+  1. NADA de archivos estáticos. Ni CSS, ni imágenes, ni fuentes. Los estilos van
+     embebidos y la marca es tipográfica. Una página de error que necesita que el
+     manifiesto de `collectstatic` o WhiteNoise estén sanos falla justo el día que
+     se la necesita — y un fallo dentro de la vista de 500 devuelve el error
+     genérico de Django, que es exactamente lo que esta tarea vino a sacar.
+  2. Nada que consulte la base: el 500 más común es que la base no responda.
+  3. Paleta y radios de docs/diseno.md, los mismos del panel (7.3) y de la app.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}Friese{% endblock %}</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #1a1a22;
+      color: #f1f1f5;
+      font-family: Inter, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    main {
+      width: 100%;
+      max-width: 30rem;
+      background: #24242e;
+      border: 1px solid #3a3a48;
+      border-radius: 8px;
+      padding: 32px 28px;
+    }
+    .marca {
+      margin: 0 0 24px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #d6ac31;
+    }
+    h1 { margin: 0 0 12px; font-size: 1.375rem; font-weight: 600; }
+    p { margin: 0 0 12px; color: #c9c9d4; }
+    .codigo { font-size: 0.8125rem; color: #a1a1ae; letter-spacing: 0.08em; }
+    a.boton {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      background: #4f46e5;
+      color: #ffffff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    a.boton.secundario { background: transparent; border: 1px solid #70707f; color: #f1f1f5; }
+    .soporte {
+      margin: 24px 0 0;
+      padding-top: 16px;
+      border-top: 1px solid #3a3a48;
+      font-size: 0.875rem;
+      color: #a1a1ae;
+    }
+    /* El indigo del spec como TEXTO sobre el fondo oscuro da 2.75:1; este es el
+       mismo aclarado que ya usan el panel (7.3) y la app (6.5). */
+    .soporte a { color: #a5b4fc; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="marca">Friese</p>
+    <p class="codigo">{% block codigo %}{% endblock %}</p>
+    <h1>{% block encabezado %}{% endblock %}</h1>
+    {% block mensaje %}{% endblock %}
+
+    <p>
+      <a class="boton" href="{{ app_url }}">Ir a Friese</a>
+      <a class="boton secundario" href="/admin/">Ir al panel</a>
+    </p>
+
+    {% if support_email %}
+    <p class="soporte">
+      ¿Necesitás una mano? Escribinos por
+      <a href="{{ support_whatsapp_url }}">WhatsApp al {{ support_whatsapp }}</a>
+      o a <a href="mailto:{{ support_email }}">{{ support_email }}</a>.
+    </p>
+    {% endif %}
+  </main>
+</body>
+</html>

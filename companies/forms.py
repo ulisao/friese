@@ -48,6 +48,8 @@ class CompanyWithFirstAdminForm(forms.ModelForm):
             "plan",
             "is_active",
             "trial_shipments_remaining",
+            "terms_accepted_at",
+            "terms_accepted_version",
         )
 
     def clean_admin_username(self):

@@ -5,6 +5,7 @@ conocimiento sobre R2 (cliente, armado del key y de la URL pública) vive acá: 
 solo pide "subí este archivo y devolveme la URL".
 """
 
+import hashlib
 import logging
 import mimetypes
 import uuid
@@ -71,13 +72,33 @@ def build_file_url(key):
     return f"{settings.R2_PUBLIC_BASE_URL.rstrip('/')}/{key}"
 
 
+def compute_file_hash(upload):
+    """SHA-256 (hex) de los bytes del archivo tal como los recibió el servidor.
+
+    Se calcula ANTES de subir a R2 y sobre el MISMO objeto que se sube: la foto no pasa
+    por ningún reprocesamiento (docs/desarrollo.md sección 3 — se guarda tal cual llega,
+    EXIF incluido), así que el hash es el del archivo original del dispositivo.
+
+    Se lee de a chunks y no con `.read()` para no cargar en memoria una foto que puede
+    llegar a los MAX_EVIDENCE_UPLOAD_MB. Al terminar rebobina: `upload_fileobj` lee
+    desde la posición actual y sin el seek(0) subiría 0 bytes.
+    """
+    digest = hashlib.sha256()
+    for chunk in upload.chunks():
+        digest.update(chunk)
+    upload.seek(0)
+    return digest.hexdigest()
+
+
 def upload_evidence_file(upload, shipment, evidence_type):
-    """Sube la foto a R2 y devuelve la URL pública del objeto.
+    """Sube la foto a R2 y devuelve (URL pública del objeto, SHA-256 del archivo).
 
     Si R2 falla, propaga EvidenceUploadError (502) para que la vista no cree un
     registro de Evidence apuntando a un archivo que no existe.
     """
     key = build_evidence_key(shipment, evidence_type, upload)
+    # Antes de la subida: el hash tiene que ser del archivo tal como llegó (tarea 8.1).
+    file_hash = compute_file_hash(upload)
     extra_args = {}
     if upload.content_type:
         extra_args["ContentType"] = upload.content_type
@@ -95,4 +116,4 @@ def upload_evidence_file(upload, shipment, evidence_type):
         )
         raise EvidenceUploadError() from exc
 
-    return build_file_url(key)
+    return build_file_url(key), file_hash
