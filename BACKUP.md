@@ -362,6 +362,28 @@ DSN.
 `BACKUP_ALERT_EMAIL` vacía, o `RESEND_API_KEY` sin cargar en ese servicio. El comando
 igual sale con código != 0 y la corrida figura fallada en Railway.
 
+**`ImproperlyConfigured: Faltan variables de entorno obligatorias`**
+Le falta alguna de las 12 de la [sección 8.2](#82--la-base-en-los-seis-servicios) a ese
+servicio. El mensaje las lista **todas** las que faltan, así que es la lista completa de
+lo que hay que agregar. En el traceback aparece antes un `KeyError` con el nombre del
+comando (`KeyError: 'backup_evidence'`): es ruido. Django busca el comando, para eso
+importa los settings, y revienta ahí. El error real es la última línea.
+
+**`AccessDenied` al listar un bucket de respaldo, con las credenciales bien cargadas**
+El servicio no tiene su par propio (`R2_BACKUP_*` o `R2_EVIDENCE_BACKUP_*`) y el código
+cae al fallback `env("R2_BACKUP_ACCESS_KEY") or R2_ACCESS_KEY`: termina pidiéndole al
+token de la app —scopeado a `friese-evidence`— que liste un bucket que no le corresponde.
+Fue la causa de la caída del 2026-08-13. Que el par propio esté cargado en OTRO servicio
+no cuenta: las variables son por servicio.
+
+**`AccessDenied` sobre `friese-evidence-backup` en `backup_evidence`, con los dos pares
+cargados**
+Mirá el nombre del bucket que el propio mensaje interpola en la línea *"si se pierde el
+bucket principal (…)"*: sale de `R2_BUCKET_NAME`. Si ahí dice `friese-evidence-backup`,
+esa variable quedó con el nombre del bucket de respaldo en vez de `friese-evidence`, y el
+comando está pidiéndole al token de la app que lea el bucket de la copia. `R2_BUCKET_NAME`
+vale `friese-evidence` en los seis servicios, siempre.
+
 ---
 
 ## 7. Respaldo de las fotos de evidencia
@@ -523,3 +545,122 @@ python smoke_tests/evidence_backup.py
 - **Un borrado con la credencial de la APP.** `R2_ACCESS_KEY` puede borrar las fotos del
   bucket principal —lo necesita para funcionar—, pero desde el 2026-08-12 ya no llega a
   ninguno de los dos buckets de respaldo. Ver la [sección 4.1](#41--bucket-y-token-en-cloudflare).
+
+---
+
+## 8. Variables de entorno por servicio
+
+Los seis crons corren el mismo repo y los mismos settings, así que **cada uno necesita
+las 12 obligatorias de producción para arrancar**, use o no lo que configuran. Encima de
+esa base, cada cron lleva solo las de su bucket.
+
+Esta sección existe porque cargar estas variables a mano, servicio por servicio, tiró
+los tres crons de backup el 2026-08-13 y falló cuatro corridas más antes de quedar
+andando. Los errores no son obvios: una variable faltante o con el valor de al lado da
+`AccessDenied`, no "te falta tal cosa".
+
+### 8.1 — Tres pares de credenciales, uno por bucket
+
+Cada token está scopeado a UN bucket y da `AccessDenied` sobre los otros dos (verificado
+contra la cuenta real). No son intercambiables y **no se renombran**: `config/settings.py`
+lee cada nombre literal con `os.environ.get`.
+
+| Par de credenciales | Bucket que abre | Quién lo usa |
+|---|---|---|
+| `R2_ACCESS_KEY` / `R2_SECRET_KEY` | `friese-evidence` | la app y `backup_evidence` (lee el origen) |
+| `R2_BACKUP_ACCESS_KEY` / `R2_BACKUP_SECRET_KEY` | `friese-backup` | `backup_database` |
+| `R2_EVIDENCE_BACKUP_ACCESS_KEY` / `_SECRET_KEY` | `friese-evidence-backup` | `backup_evidence` (escribe la copia) |
+
+Y tres nombres de bucket, uno por variable: `R2_BUCKET_NAME` (= `friese-evidence`,
+**siempre**), `R2_BACKUP_BUCKET_NAME` y `R2_EVIDENCE_BACKUP_BUCKET_NAME`.
+
+`backup_evidence` es el único que usa dos pares a la vez: lee del principal con el de la
+app y escribe en la copia con el suyo.
+
+### 8.2 — La base: en los SEIS servicios
+
+Sin estas, `config/settings.py` corta al importarse y el comando no llega a ejecutarse.
+El error las lista todas juntas.
+
+```
+DJANGO_ENV=production
+SECRET_KEY, ALLOWED_HOSTS, DATABASE_URL, FRONTEND_PUBLIC_URL,
+RESEND_API_KEY, RESEND_FROM_EMAIL, CORS_ALLOWED_ORIGINS,
+R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL
+```
+
+`CORS_ALLOWED_ORIGINS` en un cron no tiene sentido, pero el chequeo de producción la
+exige igual. Va.
+
+**La forma menos propensa a error de cargarlas** es el **Raw Editor** de la pestaña
+Variables de Railway: copiar el bloque entero del servicio **web** —que está corriendo y
+es consistente por definición— y pegarlo en el cron, salteando las `RAILWAY_*`. Cargarlas
+fila por fila es lo que produjo todas las fallas de arriba.
+
+### 8.3 — Lo propio de cada cron
+
+| Servicio | Config file path | Cron | Además de la base |
+|---|---|---|---|
+| `cron-backup` | `railway.cron-backup.json` | `0 3,15 * * *` | `R2_BACKUP_*` + `BACKUP_ALERT_EMAIL` |
+| `cron-backup-check` | `railway.cron-backup-check.json` | `0 5,17 * * *` | `R2_BACKUP_*` + `BACKUP_ALERT_EMAIL` |
+| `cron-evidence-backup` | `railway.cron-evidence-backup.json` | `0 */6 * * *` | `R2_EVIDENCE_BACKUP_*` + `BACKUP_ALERT_EMAIL` |
+| `cron-evidence-check` | `railway.cron-evidence-check.json` | `0 8 * * *` | `R2_EVIDENCE_BACKUP_*` + `BACKUP_ALERT_EMAIL` |
+| `cron-close` | `railway.cron-close.json` | `*/15 * * * *` | nada |
+| `cron-reminders` | `railway.cron-reminders.json` | `0 * * * *` | nada |
+
+El servicio **web** lleva, además de la base, `SUPPORT_NOTIFICATION_EMAIL` (tarea 9.2):
+las casillas —separadas por coma— que reciben el aviso cuando una empresa abre un ticket
+de soporte desde el panel. Ningún cron la usa; el aviso lo dispara el alta del ticket.
+Si queda vacía, el ticket se crea igual y hay que volver a mirar el panel a mano.
+
+Los `*_BUCKET_NAME` de respaldo son opcionales: el default del código ya trae el nombre
+correcto. Cargarlos igual, explícitos, para que el valor esté a la vista en el panel.
+
+**Los tokens de respaldo NO van en Shared Variables ni en el servicio web.** Que vivan
+solo en sus dos crons es lo que hace que un leak de la credencial de la app no alcance
+para borrar las copias (ver [sección 4.1](#41--bucket-y-token-en-cloudflare)).
+
+### 8.4 — Verificar los seis sin esperar a que corran
+
+Con el `.env` local completo, desde la raíz del repo:
+
+```bash
+# Que los tres tokens lleguen a su bucket y a ninguno más
+python manage.py shell -c "
+import boto3
+from botocore.config import Config
+from django.conf import settings as s
+tokens = {'app': (s.R2_ACCESS_KEY, s.R2_SECRET_KEY),
+          'A':   (s.R2_BACKUP_ACCESS_KEY, s.R2_BACKUP_SECRET_KEY),
+          'B':   (s.R2_EVIDENCE_BACKUP_ACCESS_KEY, s.R2_EVIDENCE_BACKUP_SECRET_KEY)}
+for n, (ak, sk) in tokens.items():
+    c = boto3.client('s3', endpoint_url=s.R2_ENDPOINT_URL, aws_access_key_id=ak,
+                     aws_secret_access_key=sk, region_name='auto',
+                     config=Config(signature_version='s3v4'))
+    for b in ['friese-evidence', 'friese-backup', 'friese-evidence-backup']:
+        try:
+            c.list_objects_v2(Bucket=b, MaxKeys=1); print(f'{n} -> {b}: ACCESO')
+        except Exception as e:
+            print(f'{n} -> {b}: ' + ('DENEGADO' if 'AccessDenied' in str(e) else type(e).__name__))
+"
+```
+
+Lo correcto es la diagonal: cada token con ACCESO en el suyo y DENEGADO en los otros dos.
+
+Para el estado del backup en sí, sin disparar los emails de alerta que mandan los
+`--check-only`:
+
+```bash
+python manage.py shell -c "
+from django.utils import timezone
+from ops.backup import get_backup_client, list_backups, check_freshness
+from ops.evidence_backup import list_source, list_backup, referenced_keys
+b = list_backups(get_backup_client())
+fresh, age, _ = check_freshness(b, timezone.now())
+print(f'friese-backup: {len(b)} dump(s), el mas nuevo {age:.1f}h -> {\"FRESCO\" if fresh else \"VENCIDO\"}')
+src, bkp, ref = list_source(), list_backup(), referenced_keys()
+print(f'evidencia: principal {len(src)} | respaldo {len(bkp)} | referenciadas {len(ref)}')
+print(f'  sin copiar: {len([k for k in src if k not in bkp])}')
+print(f'  referenciadas que ya no estan: {len([k for k in ref if k not in src])}')
+"
+```
