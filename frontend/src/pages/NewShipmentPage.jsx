@@ -10,6 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
+// Tarea 11.4: cuánto queda visible el check de éxito antes de cerrar la cámara.
+const SCAN_SUCCESS_DISPLAY_MS = 600
+
 /*
  * Alta de un remito en draft (tarea 2.7): datos del receptor + productos.
  *
@@ -44,6 +47,7 @@ export function NewShipmentPage() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanBusy, setScanBusy] = useState(false)
   const [scanNotice, setScanNotice] = useState(null)
+  const [scanSuccess, setScanSuccess] = useState(false)
 
   const loadProducts = useCallback(async () => {
     setProductsStatus('loading')
@@ -105,16 +109,31 @@ export function NewShipmentPage() {
 
   function openScanner() {
     setScanNotice(null)
+    setScanSuccess(false)
     setScannerOpen(true)
   }
 
+  // Cerrar por "Cancelar" o por "Escribir a mano" (tarea 11.4) es la misma
+  // acción: se abandona el escaneo y el operador queda en el buscador manual,
+  // que ya estaba ahí como fallback (comportamiento actual).
+  function closeScanner() {
+    setScannerOpen(false)
+    setScanNotice(null)
+    setScanSuccess(false)
+  }
+
   /*
-   * Tarea 11.3: un código QR decodificado se busca con GET
-   * /api/products/by-barcode/ (tarea 11.2). Si aparece, solo se SELECCIONA
-   * (igual que tocar el producto en la lista manual) y se cierra la cámara —
-   * la cantidad la sigue escribiendo el operador, así no se agrega un ítem con
-   * una cantidad adivinada. Si no aparece, la cámara sigue abierta con un aviso
-   * para poder reintentar o cancelar y escribir a mano.
+   * Tarea 11.3: un código decodificado (QR o EAN-13/Code128, ver
+   * BarcodeScanner) se busca con GET /api/products/by-barcode/ (tarea 11.2).
+   * Si aparece, solo se SELECCIONA (igual que tocar el producto en la lista
+   * manual) y se cierra la cámara — la cantidad la sigue escribiendo el
+   * operador, así no se agrega un ítem con una cantidad adivinada. Si no
+   * aparece, la cámara sigue abierta con un aviso para poder reintentar o
+   * cancelar y escribir a mano.
+   *
+   * Tarea 11.4: antes de cerrar al encontrar el producto se deja ver un check
+   * breve (SCAN_SUCCESS_DISPLAY_MS) — cerrar de golpe se sentía como si el
+   * escaneo no hubiera confirmado nada.
    */
   const handleBarcodeDetected = useCallback(async (code) => {
     setScanBusy(true)
@@ -126,15 +145,21 @@ export function NewShipmentPage() {
       )
       setSelectedProductId(data.id)
       setSearch('')
-      setScannerOpen(false)
+      setScanSuccess(true)
+      // El busy se mantiene hasta cerrar: si se libera antes, la cámara
+      // vuelve a decodificar durante la animación de éxito.
+      setTimeout(() => {
+        setScannerOpen(false)
+        setScanBusy(false)
+        setScanSuccess(false)
+      }, SCAN_SUCCESS_DISPLAY_MS)
     } catch (error) {
+      setScanBusy(false)
       setScanNotice(
         error?.response?.status === 404
           ? 'Código no reconocido, escribilo a mano.'
           : 'No se pudo buscar el código. Intentá de nuevo.',
       )
-    } finally {
-      setScanBusy(false)
     }
   }, [])
 
@@ -295,6 +320,7 @@ export function NewShipmentPage() {
                         variant="outline"
                         className="h-12 shrink-0"
                         data-testid="open-scanner"
+                        disabled={scannerOpen}
                         onClick={openScanner}
                       >
                         Escanear código
@@ -447,9 +473,11 @@ export function NewShipmentPage() {
       {scannerOpen && (
         <BarcodeScanner
           onDetect={handleBarcodeDetected}
-          onClose={() => setScannerOpen(false)}
+          onClose={closeScanner}
+          onRetryNotice={() => setScanNotice(null)}
           busy={scanBusy}
           notice={scanNotice}
+          success={scanSuccess}
         />
       )}
     </div>

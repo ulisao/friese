@@ -1,36 +1,66 @@
 import jsQR from 'jsqr'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 
 /*
- * Escaneo de código QR en vivo (tarea 11.3). Reutiliza el patrón de cámara de
- * CameraCapture (getUserMedia a pantalla completa), pero en vez de un obturador
- * manual analiza cada frame con jsQR y llama a onDetect apenas decodifica algo.
+ * Escaneo de código en vivo (tarea 11.3, ampliado en la 11.4). Reutiliza el
+ * patrón de cámara de CameraCapture (getUserMedia a pantalla completa), pero
+ * en vez de un obturador manual analiza cada frame con jsQR y llama a
+ * onDetect apenas decodifica algo.
  *
- * Solo QR: EAN-13/Code128 quedan para el campo de búsqueda manual de
- * NewShipmentPage, que ya acepta el código de barras como texto (es válido para
- * un MVP — ver nota técnica de la tarea).
+ * Tarea 11.4 — nota sobre libraries y dependencias, opción B: además de QR
+ * (jsQR, ~5KB, va en el bundle principal) ahora también decodifica
+ * EAN-13/EAN-8/Code128 con `@ericblade/quagga2`, pero ESE paquete se
+ * `import()` dinámico recién al montar este componente (es decir, cuando el
+ * operador aprieta "Escanear"), nunca en la carga inicial de la app — si la
+ * descarga falla (offline, bloqueado) no es fatal, se sigue escaneando QR
+ * igual. `quagga2` declara `sharp`/`ndarray-pixels` como
+ * optionalDependencies para su modo Node (decodificar un archivo en disco);
+ * el build de Vite usa el campo "browser" del paquete (`dist/quagga.min.js`)
+ * y nunca los importa, así que no viajan al bundle ni corren en el navegador.
+ *
+ * jsQR corre en CADA frame (muy liviano, es lo común: QR). `Quagga.decodeSingle`
+ * relocaliza y decodifica la imagen entera cada vez que se llama —no es un
+ * stream continuo como jsQR—, así que se llama cada QUAGGA_INTERVAL_MS sobre
+ * el mismo canvas ya capturado, y solo cuando jsQR no encontró nada en ese
+ * frame. Tirarlo en cada frame saturaría la CPU del celular sin ganar nada.
  *
  * El padre controla qué pasa con cada código detectado (busca el producto,
- * decide si agregarlo) a través de `busy` y `notice`: mientras `busy` es true
- * se deja de decodificar para no disparar el mismo código de nuevo antes de
- * que el padre termine, y `notice` muestra un mensaje corto (ej. "no
- * encontrado") sin cerrar la cámara.
+ * decide si agregarlo) a través de `busy`, `notice` y `success`: mientras
+ * `busy` es true se deja de decodificar para no disparar el mismo código de
+ * nuevo antes de que el padre termine, `notice` muestra un mensaje corto de
+ * error (ej. "no encontrado") con opción de reintentar o pasar a carga
+ * manual, y `success` muestra brevemente una confirmación antes de que el
+ * padre cierre la cámara.
  */
-export function BarcodeScanner({ onDetect, onClose, busy = false, notice = null }) {
+const RETRY_COOLDOWN_MS = 3000
+const QUAGGA_INTERVAL_MS = 450
+const QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'code_128_reader']
+
+export function BarcodeScanner({
+  onDetect,
+  onClose,
+  onRetryNotice,
+  busy = false,
+  notice = null,
+  success = false,
+}) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
   const lockedRef = useRef(false)
   // Último código ya probado y cuándo: si el código no se encontró, la cámara
-  // sigue apuntando al mismo QR en cada frame siguiente, y sin este cooldown
-  // se dispara onDetect decenas de veces por segundo (mismo código, mismo 404),
-  // lo que además hace parpadear el aviso antes de que el operador llegue a
-  // leerlo. Un código DISTINTO no espera el cooldown.
+  // sigue apuntando al mismo código en cada frame siguiente, y sin este
+  // cooldown se dispara onDetect decenas de veces por segundo (mismo código,
+  // mismo 404), lo que además hace parpadear el aviso antes de que el
+  // operador llegue a leerlo. Un código DISTINTO no espera el cooldown.
   const lastAttemptRef = useRef({ code: null, at: 0 })
-  const RETRY_COOLDOWN_MS = 3000
+  const quaggaRef = useRef(null)
+  const quaggaBusyRef = useRef(false)
+  const lastQuaggaAttemptRef = useRef(0)
   const [status, setStatus] = useState('starting') // 'starting' | 'ready' | 'error'
   const [error, setError] = useState(null)
 
@@ -41,6 +71,32 @@ export function BarcodeScanner({ onDetect, onClose, busy = false, notice = null 
   useEffect(() => {
     if (!busy) lockedRef.current = false
   }, [busy])
+
+  useEffect(() => {
+    let cancelled = false
+    import('@ericblade/quagga2')
+      .then((module) => {
+        if (!cancelled) quaggaRef.current = module.default ?? module
+      })
+      .catch(() => {
+        // Sin conexión o bloqueado: seguimos solo con QR, no hace falta avisar.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const reportCode = useCallback(
+    (value) => {
+      const last = lastAttemptRef.current
+      const sameCodeTooSoon = value === last.code && Date.now() - last.at < RETRY_COOLDOWN_MS
+      if (sameCodeTooSoon) return
+      lastAttemptRef.current = { code: value, at: Date.now() }
+      lockedRef.current = true
+      onDetect(value)
+    },
+    [onDetect],
+  )
 
   const tick = useCallback(() => {
     const video = videoRef.current
@@ -53,18 +109,32 @@ export function BarcodeScanner({ onDetect, onClose, busy = false, notice = null 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const code = jsQR(imageData.data, imageData.width, imageData.height)
       if (code?.data) {
-        const last = lastAttemptRef.current
-        const sameCodeTooSoon =
-          code.data === last.code && Date.now() - last.at < RETRY_COOLDOWN_MS
-        if (!sameCodeTooSoon) {
-          lastAttemptRef.current = { code: code.data, at: Date.now() }
-          lockedRef.current = true
-          onDetect(code.data)
+        reportCode(code.data)
+      } else if (quaggaRef.current && !quaggaBusyRef.current) {
+        const now = Date.now()
+        if (now - lastQuaggaAttemptRef.current >= QUAGGA_INTERVAL_MS) {
+          lastQuaggaAttemptRef.current = now
+          quaggaBusyRef.current = true
+          quaggaRef.current
+            .decodeSingle({
+              src: canvas.toDataURL('image/jpeg', 0.8),
+              numOfWorkers: 0,
+              locate: true,
+              decoder: { readers: QUAGGA_READERS },
+            })
+            .then((result) => {
+              const barcode = result?.codeResult?.code
+              if (barcode) reportCode(barcode)
+            })
+            .catch(() => {})
+            .finally(() => {
+              quaggaBusyRef.current = false
+            })
         }
       }
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [onDetect])
+  }, [reportCode])
 
   useEffect(() => {
     let cancelled = false
@@ -124,6 +194,11 @@ export function BarcodeScanner({ onDetect, onClose, busy = false, notice = null 
     }
   }, [status, tick])
 
+  // Con notice o success mostramos ESO en vez del hint de "apuntá al código":
+  // mezclar los tres a la vez recargaba la pantalla justo cuando el operador
+  // más necesita leer un solo mensaje claro.
+  const showHint = status === 'ready' && !notice && !success
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black" data-testid="barcode-scanner">
       <div className="relative min-h-0 w-full flex-1 overflow-hidden">
@@ -142,27 +217,72 @@ export function BarcodeScanner({ onDetect, onClose, busy = false, notice = null 
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
             {/* Reticle: guía simple para apuntar el código, no hace falta más para el MVP. */}
             <div className="size-56 max-w-full rounded-lg border-2 border-red-500" aria-hidden="true" />
-            <p
-              role="status"
-              data-testid="scanner-hint"
-              className="rounded bg-black/60 px-3 py-1 text-center text-sm text-white"
-            >
-              {busy ? 'Buscando producto…' : 'Apuntá al código'}
-            </p>
-            {notice && (
+
+            {showHint && (
               <p
-                role="alert"
-                data-testid="scanner-notice"
-                className="rounded bg-black/60 px-3 py-1 text-center text-sm text-white"
+                role="status"
+                data-testid="scanner-hint"
+                className="flex items-center gap-2 rounded bg-black/60 px-3 py-1 text-center text-sm text-white"
               >
-                {notice}
+                <Loader2
+                  className={`size-4 shrink-0 animate-spin ${busy ? '' : 'text-white/50'}`}
+                  aria-hidden="true"
+                />
+                {busy ? 'Buscando producto…' : 'Apuntá al código'}
               </p>
+            )}
+
+            {success && (
+              <div
+                role="status"
+                data-testid="scanner-success"
+                className="animate-scan-success flex flex-col items-center gap-2 rounded bg-black/70 px-4 py-3 text-white"
+              >
+                <CheckCircle2 className="size-10 text-green-400" aria-hidden="true" />
+                <span className="text-sm">Producto encontrado</span>
+              </div>
+            )}
+
+            {notice && !success && (
+              <div
+                className="pointer-events-auto flex flex-col items-center gap-3 rounded bg-black/70 px-4 py-3"
+                data-testid="scanner-notice"
+              >
+                <p role="alert" className="text-center text-sm font-medium text-red-400">
+                  {notice}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-10"
+                    data-testid="scanner-retry"
+                    onClick={onRetryNotice}
+                  >
+                    Intentar de nuevo
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-10"
+                    data-testid="scanner-manual"
+                    onClick={onClose}
+                  >
+                    Escribir a mano
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}
 
         {status !== 'ready' && (
-          <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+            {status === 'starting' && (
+              <Loader2 className="size-8 animate-spin text-white/70" aria-hidden="true" />
+            )}
             <p role={status === 'error' ? 'alert' : undefined} className="text-sm text-white">
               {status === 'error' ? error : 'Abriendo la cámara…'}
             </p>

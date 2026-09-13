@@ -90,3 +90,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Check de éxito del escaneo (tarea 11.4): "aparece rápido", no hace falta más. */
+@keyframes scan-success-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scan-success {
+  animation: scan-success-pop 250ms ease-out;
+}
