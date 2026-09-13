@@ -21,11 +21,18 @@ import { Button } from '@/components/ui/button'
  * el build de Vite usa el campo "browser" del paquete (`dist/quagga.min.js`)
  * y nunca los importa, así que no viajan al bundle ni corren en el navegador.
  *
- * jsQR corre en CADA frame (muy liviano, es lo común: QR). `Quagga.decodeSingle`
- * relocaliza y decodifica la imagen entera cada vez que se llama —no es un
- * stream continuo como jsQR—, así que se llama cada QUAGGA_INTERVAL_MS sobre
- * el mismo canvas ya capturado, y solo cuando jsQR no encontró nada en ese
- * frame. Tirarlo en cada frame saturaría la CPU del celular sin ganar nada.
+ * jsQR se probó corriendo en CADA frame (hasta 60/seg) y se sentía lento: a
+ * 1920x1080 el `getImageData` + decode de cada frame es pesado, y correrlo así
+ * de seguido satura el hilo principal (la cámara y el resto de la pantalla se
+ * ponen a los tirones). Acá se cachea la resolución a 1280x720 —de sobra para
+ * un código a la distancia a la que se lo apunta a propósito— y el decode se
+ * throttlea a SCAN_INTERVAL_MS: el ojo humano no nota la diferencia entre
+ * decodificar 60 o ~8 veces por segundo, pero el hilo principal sí. Adentro de
+ * ese mismo intervalo, si jsQR no encontró nada, `Quagga.decodeSingle`
+ * relocaliza y decodifica la imagen entera de nuevo —no es un stream continuo
+ * como jsQR—, así que además tiene su propio cooldown más largo
+ * (QUAGGA_INTERVAL_MS): es la pasada más cara de las dos (recodifica a JPEG)
+ * y no hace falta intentarla tan seguido.
  *
  * El padre controla qué pasa con cada código detectado (busca el producto,
  * decide si agregarlo) a través de `busy`, `notice` y `success`: mientras
@@ -36,8 +43,68 @@ import { Button } from '@/components/ui/button'
  * padre cierre la cámara.
  */
 const RETRY_COOLDOWN_MS = 3000
+const SCAN_INTERVAL_MS = 120
 const QUAGGA_INTERVAL_MS = 450
 const QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'code_128_reader']
+
+/*
+ * Recorte al reticle: sin esto, jsQR/Quagga analizan el FRAME ENTERO, así que
+ * cualquier texto o número que quede alrededor del código dentro de cuadro
+ * (una etiqueta con tablas, otro código, lo que sea) es candidato a
+ * "detectado" tanto como el código real — es lo que reportaba el operador
+ * como "el sistema lee cualquier cosa" en una caja con números impresos
+ * alrededor del código de barras. La solución no es al revés (ajustar el
+ * reticle a lo que se decodifica): es que las dos librerías reciban SOLO los
+ * píxeles que caen dentro del reticle.
+ *
+ * El <video> usa `object-fit: contain`, así que la imagen se ve completa
+ * pero con letterbox (barras) si el aspect ratio del contenedor no coincide
+ * con el de la cámara — el reticle está posicionado en pantalla relativo al
+ * contenedor, no al frame nativo. `computeCropRect` deshace ese letterbox
+ * para traducir el rectángulo del reticle (coordenadas de pantalla) a
+ * coordenadas de píxel del video nativo, que es lo que hace falta para
+ * recortar con `drawImage`.
+ */
+function computeCropRect(video, reticle) {
+  const videoRect = video.getBoundingClientRect()
+  const reticleRect = reticle.getBoundingClientRect()
+  const videoAspect = video.videoWidth / video.videoHeight
+  const boxAspect = videoRect.width / videoRect.height
+
+  let displayWidth
+  let displayHeight
+  let offsetX
+  let offsetY
+  if (boxAspect > videoAspect) {
+    displayHeight = videoRect.height
+    displayWidth = displayHeight * videoAspect
+    offsetX = (videoRect.width - displayWidth) / 2
+    offsetY = 0
+  } else {
+    displayWidth = videoRect.width
+    displayHeight = displayWidth / videoAspect
+    offsetX = 0
+    offsetY = (videoRect.height - displayHeight) / 2
+  }
+
+  const scale = video.videoWidth / displayWidth
+  const x = (reticleRect.left - videoRect.left - offsetX) * scale
+  const y = (reticleRect.top - videoRect.top - offsetY) * scale
+  const w = reticleRect.width * scale
+  const h = reticleRect.height * scale
+
+  // Clamp: si algo dio un valor fuera de rango (redondeos, un layout todavía
+  // no asentado), mejor un recorte un poco corrido que un `drawImage` con
+  // dimensiones inválidas, que tira excepción y corta el loop de escaneo.
+  const clampedX = Math.max(0, Math.min(x, video.videoWidth - 1))
+  const clampedY = Math.max(0, Math.min(y, video.videoHeight - 1))
+  return {
+    x: clampedX,
+    y: clampedY,
+    w: Math.max(1, Math.min(w, video.videoWidth - clampedX)),
+    h: Math.max(1, Math.min(h, video.videoHeight - clampedY)),
+  }
+}
 
 export function BarcodeScanner({
   onDetect,
@@ -48,9 +115,11 @@ export function BarcodeScanner({
   success = false,
 }) {
   const videoRef = useRef(null)
+  const reticleRef = useRef(null)
   const streamRef = useRef(null)
   const canvasRef = useRef(null)
   const rafRef = useRef(null)
+  const cropRectRef = useRef(null)
   const lockedRef = useRef(false)
   // Último código ya probado y cuándo: si el código no se encontró, la cámara
   // sigue apuntando al mismo código en cada frame siguiente, y sin este
@@ -58,6 +127,7 @@ export function BarcodeScanner({
   // mismo 404), lo que además hace parpadear el aviso antes de que el
   // operador llegue a leerlo. Un código DISTINTO no espera el cooldown.
   const lastAttemptRef = useRef({ code: null, at: 0 })
+  const lastScanAtRef = useRef(0)
   const quaggaRef = useRef(null)
   const quaggaBusyRef = useRef(false)
   const lastQuaggaAttemptRef = useRef(0)
@@ -100,18 +170,26 @@ export function BarcodeScanner({
 
   const tick = useCallback(() => {
     const video = videoRef.current
-    if (video?.videoWidth && !lockedRef.current) {
+    const now = Date.now()
+    if (video?.videoWidth && !lockedRef.current && now - lastScanAtRef.current >= SCAN_INTERVAL_MS) {
+      lastScanAtRef.current = now
       const canvas = canvasRef.current
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
+      const crop = cropRectRef.current
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      if (crop) {
+        canvas.width = crop.w
+        canvas.height = crop.h
+        ctx.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
+      } else {
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      }
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const code = jsQR(imageData.data, imageData.width, imageData.height)
       if (code?.data) {
         reportCode(code.data)
       } else if (quaggaRef.current && !quaggaBusyRef.current) {
-        const now = Date.now()
         if (now - lastQuaggaAttemptRef.current >= QUAGGA_INTERVAL_MS) {
           lastQuaggaAttemptRef.current = now
           quaggaBusyRef.current = true
@@ -150,8 +228,8 @@ export function BarcodeScanner({
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
           audio: false,
         })
@@ -194,6 +272,26 @@ export function BarcodeScanner({
     }
   }, [status, tick])
 
+  // El recorte se recalcula cuando la cámara queda lista (recién ahí el
+  // reticle y el <video> tienen su tamaño final) y si cambia el layout
+  // (rotar el celular, redimensionar la ventana) — la posición en pantalla
+  // del reticle relativa al video cambia con eso.
+  useEffect(() => {
+    if (status !== 'ready') return
+    const recompute = () => {
+      if (videoRef.current && reticleRef.current) {
+        cropRectRef.current = computeCropRect(videoRef.current, reticleRef.current)
+      }
+    }
+    recompute()
+    window.addEventListener('resize', recompute)
+    window.addEventListener('orientationchange', recompute)
+    return () => {
+      window.removeEventListener('resize', recompute)
+      window.removeEventListener('orientationchange', recompute)
+    }
+  }, [status])
+
   // Con notice o success mostramos ESO en vez del hint de "apuntá al código":
   // mezclar los tres a la vez recargaba la pantalla justo cuando el operador
   // más necesita leer un solo mensaje claro.
@@ -215,8 +313,14 @@ export function BarcodeScanner({
 
         {status === 'ready' && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
-            {/* Reticle: guía simple para apuntar el código, no hace falta más para el MVP. */}
-            <div className="size-56 max-w-full rounded-lg border-2 border-red-500" aria-hidden="true" />
+            {/* Reticle: guía simple para apuntar el código, y también el recorte real
+                que se decodifica (ver computeCropRect) — todo lo que quede afuera no
+                se analiza. */}
+            <div
+              ref={reticleRef}
+              className="size-56 max-w-full rounded-lg border-2 border-red-500"
+              aria-hidden="true"
+            />
 
             {showHint && (
               <p

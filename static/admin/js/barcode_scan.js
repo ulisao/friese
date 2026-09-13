@@ -28,12 +28,74 @@
  * detecta un código, se muestra, y el admin decide. Por eso no hace falta
  * cooldown ni relock — apenas se detecta algo el loop se pausa entero hasta
  * que el admin confirma, reintenta o cancela.
+ *
+ * Resolución y throttle (mismo ajuste que en el frontend, BarcodeScanner.jsx):
+ * sin tope de resolución la cámara puede entregar cuadros mucho más grandes
+ * de lo necesario, y decodificar eso en CADA frame (hasta 60/seg) satura el
+ * hilo principal — la cámara y el resto de la página se sienten lentos. Se
+ * pide 1280x720 (de sobra para un código a la distancia a la que se lo
+ * apunta) y el decode se throttlea a SCAN_INTERVAL_MS: el ojo no nota la
+ * diferencia entre 60 y ~8 intentos por segundo, pero el hilo principal sí.
+ *
+ * Recorte al reticle: sin esto, jsQR/Quagga analizan el FRAME ENTERO, así que
+ * cualquier número o texto que quede alrededor del código dentro del cuadro
+ * (una etiqueta con tablas, otro código impreso cerca) es candidato a
+ * "detectado" tanto como el código real. La solución es que las dos
+ * librerías reciban SOLO los píxeles que caen dentro del reticle rojo.
+ *
+ * El <video> usa `object-fit: contain` (ver barcode_scan.css), así que la
+ * imagen se ve completa pero con letterbox si el aspect ratio del contenedor
+ * no coincide con el de la cámara — el reticle está posicionado en pantalla
+ * relativo al contenedor, no al frame nativo. `computeCropRect` deshace ese
+ * letterbox para traducir el rectángulo del reticle (coordenadas de
+ * pantalla) a coordenadas de píxel del video nativo, que es lo que hace
+ * falta para recortar con `drawImage`.
  */
 (function () {
   'use strict'
 
+  var SCAN_INTERVAL_MS = 120
   var QUAGGA_INTERVAL_MS = 450
   var QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'code_128_reader']
+
+  function computeCropRect(video, reticleEl) {
+    var videoRect = video.getBoundingClientRect()
+    var reticleRect = reticleEl.getBoundingClientRect()
+    var videoAspect = video.videoWidth / video.videoHeight
+    var boxAspect = videoRect.width / videoRect.height
+
+    var displayWidth, displayHeight, offsetX, offsetY
+    if (boxAspect > videoAspect) {
+      displayHeight = videoRect.height
+      displayWidth = displayHeight * videoAspect
+      offsetX = (videoRect.width - displayWidth) / 2
+      offsetY = 0
+    } else {
+      displayWidth = videoRect.width
+      displayHeight = displayWidth / videoAspect
+      offsetX = 0
+      offsetY = (videoRect.height - displayHeight) / 2
+    }
+
+    var scale = video.videoWidth / displayWidth
+    var x = (reticleRect.left - videoRect.left - offsetX) * scale
+    var y = (reticleRect.top - videoRect.top - offsetY) * scale
+    var w = reticleRect.width * scale
+    var h = reticleRect.height * scale
+
+    // Clamp: si algo dio un valor fuera de rango (redondeos, un layout
+    // todavía no asentado), mejor un recorte un poco corrido que un
+    // `drawImage` con dimensiones inválidas, que tira excepción y corta el
+    // loop de escaneo.
+    var clampedX = Math.max(0, Math.min(x, video.videoWidth - 1))
+    var clampedY = Math.max(0, Math.min(y, video.videoHeight - 1))
+    return {
+      x: clampedX,
+      y: clampedY,
+      w: Math.max(1, Math.min(w, video.videoWidth - clampedX)),
+      h: Math.max(1, Math.min(h, video.videoHeight - clampedY)),
+    }
+  }
 
   function init() {
     var triggers = document.querySelectorAll('[data-barcode-scan-trigger]')
@@ -121,7 +183,17 @@
       paused: false,
       quaggaBusy: false,
       lastQuaggaAt: 0,
+      lastScanAt: 0,
+      cropRect: null,
     }
+
+    function recomputeCropRect() {
+      if (!root.hidden && video.videoWidth) {
+        state.cropRect = computeCropRect(video, reticle)
+      }
+    }
+    window.addEventListener('resize', recomputeCropRect)
+    window.addEventListener('orientationchange', recomputeCropRect)
 
     function setStatus(text, isError) {
       status.textContent = text || ''
@@ -155,10 +227,14 @@
     }
 
     function tick() {
-      if (!state.paused && video.videoWidth) {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      var now = Date.now()
+      if (!state.paused && video.videoWidth && now - state.lastScanAt >= SCAN_INTERVAL_MS) {
+        state.lastScanAt = now
+        if (!state.cropRect) state.cropRect = computeCropRect(video, reticle)
+        var crop = state.cropRect
+        canvas.width = crop.w
+        canvas.height = crop.h
+        ctx.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h)
         var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         var qrResult = window.jsQR
           ? window.jsQR(imageData.data, imageData.width, imageData.height)
@@ -166,7 +242,6 @@
         if (qrResult && qrResult.data) {
           onDetected(qrResult.data)
         } else if (window.Quagga && !state.quaggaBusy) {
-          var now = Date.now()
           if (now - state.lastQuaggaAt >= QUAGGA_INTERVAL_MS) {
             state.lastQuaggaAt = now
             state.quaggaBusy = true
@@ -193,6 +268,7 @@
     function open(input) {
       state.input = input
       state.paused = false
+      state.cropRect = null
       result.hidden = true
       setStatus('Abriendo la cámara…')
       root.hidden = false
@@ -204,7 +280,11 @@
 
       navigator.mediaDevices
         .getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         })
         .then(function (stream) {
