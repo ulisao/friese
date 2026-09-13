@@ -35,3 +35,10 @@ resend==2.35.0
 # QR de la invitación de operador (users/invites.py). Se usa el factory SVG, que
 # es Python puro: NO requiere Pillow.
 qrcode==8.2
+
+# PDF de QRs de productos para imprimir (tarea 11.5, catalog/qr_export.py). Los
+# QRs se dibujan módulo a módulo con la matriz de `qrcode`, sin pasar por
+# ninguna imagen — pero fpdf2 declara Pillow como dependencia dura igual (la usa
+# para *sus* métodos de imagen, que acá no se llaman), así que termina entrando
+# de todos modos pese a la nota de arriba.
+fpdf2==2.8.8

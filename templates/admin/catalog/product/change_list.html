@@ -1,0 +1,16 @@
+{% extends "admin/change_list.html" %}
+
+{% comment %}
+  Botón "Descargar QRs para imprimir" del listado de productos (tarea 11.5).
+  Es un link común y corriente a `/api/products/export-qrs/`: el navegador lo
+  pide con la cookie de sesión del admin (ver ProductExportQRsView, que por eso
+  acepta SessionAuthentication además del JWT de siempre).
+{% endcomment %}
+{% block object-tools-items %}
+  <li>
+    <a href="{% url 'product-export-qrs' %}" class="button">
+      Descargar QRs para imprimir
+    </a>
+  </li>
+  {{ block.super }}
+{% endblock %}
