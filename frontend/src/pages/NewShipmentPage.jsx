@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
+import { BarcodeScanner } from '@/components/BarcodeScanner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,10 @@ export function NewShipmentPage() {
   const [createdShipmentId, setCreatedShipmentId] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scanBusy, setScanBusy] = useState(false)
+  const [scanNotice, setScanNotice] = useState(null)
 
   const loadProducts = useCallback(async () => {
     setProductsStatus('loading')
@@ -97,6 +102,41 @@ export function NewShipmentPage() {
   function handleRemoveItem(key) {
     setItems((current) => current.filter((item) => item.key !== key))
   }
+
+  function openScanner() {
+    setScanNotice(null)
+    setScannerOpen(true)
+  }
+
+  /*
+   * Tarea 11.3: un código QR decodificado se busca con GET
+   * /api/products/by-barcode/ (tarea 11.2). Si aparece, solo se SELECCIONA
+   * (igual que tocar el producto en la lista manual) y se cierra la cámara —
+   * la cantidad la sigue escribiendo el operador, así no se agrega un ítem con
+   * una cantidad adivinada. Si no aparece, la cámara sigue abierta con un aviso
+   * para poder reintentar o cancelar y escribir a mano.
+   */
+  const handleBarcodeDetected = useCallback(async (code) => {
+    setScanBusy(true)
+    setScanNotice(null)
+    try {
+      const { data } = await api.get('/products/by-barcode/', { params: { code } })
+      setProducts((current) =>
+        current.some((product) => product.id === data.id) ? current : [...current, data],
+      )
+      setSelectedProductId(data.id)
+      setSearch('')
+      setScannerOpen(false)
+    } catch (error) {
+      setScanNotice(
+        error?.response?.status === 404
+          ? 'Código no reconocido, escribilo a mano.'
+          : 'No se pudo buscar el código. Intentá de nuevo.',
+      )
+    } finally {
+      setScanBusy(false)
+    }
+  }, [])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -242,13 +282,24 @@ export function NewShipmentPage() {
                 <>
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="product-search">Buscar producto</Label>
-                    <Input
-                      id="product-search"
-                      className="h-12"
-                      placeholder="Nombre o código de barras"
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="product-search"
+                        className="h-12 flex-1"
+                        placeholder="Nombre o código de barras"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-12 shrink-0"
+                        data-testid="open-scanner"
+                        onClick={openScanner}
+                      >
+                        Escanear código
+                      </Button>
+                    </div>
                   </div>
 
                   {matches.length === 0 ? (
@@ -392,6 +443,15 @@ export function NewShipmentPage() {
           </Button>
         </form>
       </main>
+
+      {scannerOpen && (
+        <BarcodeScanner
+          onDetect={handleBarcodeDetected}
+          onClose={() => setScannerOpen(false)}
+          busy={scanBusy}
+          notice={scanNotice}
+        />
+      )}
     </div>
   )
 }

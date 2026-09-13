@@ -7,9 +7,10 @@
  * recibe un email y después entra a la web tiene que encontrar el mismo contacto en
  * todos lados. Si se cambia acá, hay que cambiarlo en esos dos archivos.
  *
- * OJO — `contacto@friese.com.ar` todavía NO recibe correo: el dominio no tiene
- * registros MX. Hasta que se configure el reenvío, el canal que funciona de verdad
- * es el WhatsApp; por eso los dos se muestran siempre juntos.
+ * `contacto@friese.com.ar` SÍ recibe correo desde el 2026-09-05, vía Cloudflare
+ * Email Routing (reenvío a la casilla de negocio). Es reenvío y no buzón: se recibe
+ * ahí, pero responder desde esa dirección necesita configuración aparte. Los dos
+ * canales se siguen mostrando juntos igual — en el depósito el WhatsApp gana.
  *
  * Van como constantes y no como variables de Vite: es información pública y una
  * variable más es una variable más para olvidarse de cargar en Vercel.

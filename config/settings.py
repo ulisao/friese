@@ -440,10 +440,17 @@ SUPPORT_NOTIFICATION_EMAIL = env("SUPPORT_NOTIFICATION_EMAIL")
 # cargar en Railway — con el agravante de que si queda vacía, la pantalla de error
 # no dice a dónde escribir.
 #
-# OJO — `contacto@friese.com.ar` todavía NO recibe correo: el dominio no tiene
-# registros MX (verificado contra 1.1.1.1 y 8.8.8.8 el 2026-08-29). Hasta que se
-# configure el reenvío, el canal que funciona de verdad es el WhatsApp. Por eso
-# los dos van siempre juntos.
+# `contacto@friese.com.ar` SÍ recibe correo desde el 2026-09-05: el dominio tiene
+# los MX de Cloudflare Email Routing en el root y reenvía a la casilla de negocio.
+# Probado de punta a punta ese mismo día. (Antes no llegaba nada: el dominio no
+# tenía MX, y por eso el WhatsApp iba siempre al lado.)
+#
+# Es reenvío, no buzón: se RECIBE en contacto@, pero responder *desde* esa
+# dirección necesita configuración aparte. Los dos canales se siguen mostrando
+# juntos igual — en el depósito el WhatsApp gana por lejos.
+#
+# El envío de Resend NO pasa por acá: vive en `send.mail.friese.com.ar`, otra rama
+# del DNS. Tocar los MX del root no lo afecta.
 # El frontend tiene los mismos datos en `frontend/src/lib/support.js`.
 SUPPORT_CONTACT_EMAIL = "contacto@friese.com.ar"
 SUPPORT_WHATSAPP_NUMBER = "5493472430136"  # formato wa.me: solo dígitos
